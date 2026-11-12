@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { UTEXOWallet, RlnWalletManager } from '@utexo/rgb-sdk-web-legacy';
 import type { OnchainConfig, OnchainWallet } from './lib/onchain';
 import { removeSessionEntry } from './lib/session';
 import { wrapWallet } from './lib/wrapWallet';
@@ -23,36 +22,14 @@ interface LogEntry {
   level: LogLevel;
 }
 
-export interface WalletConfig {
-  network: string;
-  indexerUrl: string;
-  transportEndpoint: string;
-  masterFingerprint: string;
-  xpubVan: string;
-  xpubCol: string;
-  mnemonic: string;
-  reuseAddresses?: boolean;
-  /** RLN SDK password (stored for session restore) */
-  password?: string;
-  /** WebSocket proxy URL for the LN node. When unset, transportEndpoint is used as fallback. */
-  proxyUrl?: string;
-  /** Stable runtime ID for persistent LN node state across page reloads */
-  nodeRuntimeId?: string;
-  /** VSS cloud-backup server URL passed to the wallet; null = VSS disabled.
-   *  Undefined (legacy sessions) falls back to DEMO_VSS_URL on restore. */
-  vssUrl?: string | null;
-}
-
-interface WalletEntry {
+export interface WalletInstance {
   id: string;
   label: string;
+  type: 'onchain';
+  config: OnchainConfig;
+  instance: OnchainWallet;
   online: boolean;
 }
-
-export type WalletInstance = WalletEntry & (
-  | { type: 'utexo' | 'rln'; config: WalletConfig; instance: UTEXOWallet | RlnWalletManager }
-  | { type: 'onchain'; config: OnchainConfig & Partial<WalletConfig>; instance: OnchainWallet }
-);
 
 function loggedWallet<T extends WalletInstance>(wallet: T, log: (entry: SdkLogEntry) => void): T {
   return { ...wallet, instance: wrapWallet(wallet.instance, log) };

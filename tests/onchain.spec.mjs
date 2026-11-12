@@ -81,7 +81,11 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
   await expect(page.getByRole('heading', { name: 'Active: Restored', exact: true })).toBeVisible();
   const sessions = await page.evaluate(() => JSON.parse(localStorage.getItem('rgb_wallet_sessions')));
   expect(sessions).toHaveLength(2);
-  expect(sessions.some((entry) => entry.id === 'legacy-unavailable')).toBe(true);
+  expect(sessions.find((entry) => entry.id === 'legacy-unavailable')).toEqual({
+    id: 'legacy-unavailable', label: 'Legacy saved', type: 'utexo',
+    config: { network: 'regtest', mnemonic: '', indexerUrl: '', transportEndpoint: '', masterFingerprint: '', xpubVan: '', xpubCol: '' },
+  });
+  await expect(page.getByLabel('Active wallet').locator('option')).toHaveText(['Restored']);
   expect(sessions.find((entry) => entry.label === 'Restored').type).toBe('onchain');
 
   expect(wasm.some((r) => r.url.includes('rgb_lib_wasm') && r.status === 200)).toBe(true);
@@ -89,7 +93,7 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
   expect(errors).toEqual([]);
 });
 
-test('failed initialization is recoverable and legacy routes remain available', async ({ page }) => {
+test('failed initialization is recoverable and removed routes return home', async ({ page }) => {
   await page.goto('/onchain');
   await page.getByLabel('Mnemonic', { exact: true }).fill('invalid mnemonic');
   await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
@@ -99,8 +103,14 @@ test('failed initialization is recoverable and legacy routes remain available', 
   await page.getByLabel('Wallet label', { exact: true }).fill('Recovered');
   await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Active: Recovered', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Lightning Wallet', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('UTEXO');
-  await page.getByRole('link', { name: 'LSP & APay', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('LSP');
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveText(['Home', 'On-chain Wallet', 'Keys']);
+  await page.getByRole('link', { name: 'Home', exact: true }).click();
+  await expect(page.getByRole('main').getByRole('link')).toHaveText([
+    /On-chain Wallet/, /Keys/,
+  ]);
+  for (const route of ['/utexo-wallet', '/lsp-apay', '/backup']) {
+    await page.goto(route);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('RGB SDK Web Demo');
+    await expect(page).toHaveURL((url) => url.pathname === '/');
+  }
 });

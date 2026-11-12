@@ -1,13 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { configureLogging, LogLevel } from '@utexo/rgb-sdk-core-legacy';
+import { configureLogging, LogLevel } from '@utexo/rgb-sdk-core';
 import App from './App';
 import './index.css';
 
-// The SDK logger defaults to ERROR-only, which silently swallows every VSS
-// status line (replication enabled/failed, auto-backup failures, restore
-// skips — all info/warn). The demo exists to observe SDK behavior, so log
-// everything.
+// Show SDK diagnostics in this development playground.
 configureLogging(LogLevel.DEBUG);
 
 

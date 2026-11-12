@@ -1,6 +1,6 @@
 # RGB SDK Web Playground
 
-Browser playground for the unpublished `@utexo/rgb-sdk` facade and
+On-chain browser playground for the unpublished `@utexo/rgb-sdk` facade and
 `@utexo/rgb-sdk-web` on-chain engine. The app constructs
 `new UTEXOWallet({ engine: new RgbLibWeb(config) })` and calls the facade.
 
@@ -79,26 +79,29 @@ same-origin development proxies below, for an existing RGB_L1 stand:
 | `VITE_RGB_L1_PROXY_URL` | `/rgb-l1-proxy/json-rpc` | Browser-facing RGB proxy |
 | `VITE_RGB_L1_INDEXER_TARGET` | `http://127.0.0.1:8094` | Vite Esplora upstream |
 | `VITE_RGB_L1_PROXY_TARGET` | `http://127.0.0.1:3002` | Vite RGB proxy upstream |
+| `VITE_RGB_L1_VSS_TARGET` | `http://127.0.0.1:8181` | Vite `/vss` upstream |
 
 The new engine's `rgb-lib-wasm@1.0.0-beta.4` needs RGB proxy protocol 1.0
-(rgb-proxy-server 0.4.0+). The Lightning stand may use other ports and protocol
-versions. Fund and mine through the RGB_L1 stand's own helper. The header's
-legacy mining button is only shown for legacy wallets.
+(rgb-proxy-server 0.4.0+). Fund and mine through the RGB_L1 stand's own helper.
+Enter `/vss` in the wallet creation form to use the local VSS proxy, or an
+absolute URL for another server; blank keeps cloud backups disabled.
 
 Development proxies are not part of a static deployment. For a deployed
 regtest app, set absolute browser-accessible URLs at build time or configure
-matching reverse proxies. See `.env.example` for both sets of environment
+matching reverse proxies. See `.env.example` for the environment
 variables.
 
-## Existing Lightning demos
+## Scope and existing sessions
 
-`/utexo-wallet`, `/lsp-apay` and `/backup` retain the existing RLN/LSP/APay flows.
-They explicitly import `@utexo/rgb-sdk-web-legacy`, an npm alias pinned to
-`@utexo/rgb-sdk-web@1.0.0-beta.11`. Its core dependency stays separate from the
-new engine's core. The `/backup` page is for legacy wallets; use the on-chain
-screen's backup section for RGB_L1 wallets. Lightning is not implemented by
-the new engine. Legacy sessions retain their original type and storage;
-failed session restores are preserved when saving new profiles.
+This app uses only the new on-chain SDK. Lightning, LSP/APay and the former
+RLN backup screens, runtime dependencies and stand scripts have been removed.
+Only Home, On-chain Wallet and Keys appear in navigation; old routes return
+to Home. File and VSS backup/restore are on the on-chain wallet screen.
+
+Existing on-chain profiles reopen normally. Saved records of other wallet
+types are preserved unchanged in localStorage but never opened or converted
+into on-chain wallets. Their IndexedDB state is left intact. Profiles that
+fail to reopen are also retained when saving other wallets.
 
 ## Validation
 
@@ -112,8 +115,7 @@ npm run test:e2e
 The browser suite checks dev and production-preview builds against real WASM
 and IndexedDB: initialization failure/retry, session reload, independent
 profiles with the same mnemonic, encrypted backup/restore, profile removal,
-legacy session preservation and legacy page navigation. It needs no chain,
-proxy or VSS server and does not test funded transactions or Lightning/LSP
-network flows.
+preservation of older session records, and removal of legacy routes. It needs no chain,
+proxy or VSS server and does not test funded transactions or VSS service calls.
 
 Docker copies `vendor/` before `npm ci`; CI uses the same lockfile installation.

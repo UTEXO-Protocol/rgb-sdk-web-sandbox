@@ -1,14 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
 import { autoRestore, getSavedActiveWalletId, setUrlWallet } from './lib/session';
 import { OnchainWalletPage } from './pages/OnchainWalletPage';
 import { HomePage } from './pages/HomePage';
 import { KeysPage } from './pages/KeysPage';
-import { UtexoBackupPage } from './pages/UtexoBackupPage';
-import { UtexoWalletPage } from './pages/UtexoWalletPage';
-import { LspApayPage } from './pages/LspApayPage';
 
 function App() {
   const setSdkStatus = useStore((s) => s.setSdkStatus);
@@ -38,14 +35,7 @@ function App() {
           addLog(restored.length + ' wallet(s) restored from session', 'ok');
         }
         for (const { label, error } of errors) {
-          const isRemoved = error.includes('missing network type');
-          const isNetworkConflict = error.includes('Bitcoin network mismatch');
-          addLog(
-            'Restore failed — "' + label + '": ' + error +
-            (isRemoved ? ' (entry removed — recreate the wallet)' : '') +
-            (isNetworkConflict ? ' — IDB conflict: another wallet with the same mnemonic but a different network wrote to the same IndexedDB key. Use a different mnemonic, or clear IndexedDB in DevTools → Application → IndexedDB.' : ''),
-            'err',
-          );
+          addLog('Restore failed — "' + label + '": ' + error, 'err');
         }
         setSdkStatus('ready');
         addLog('SDK ready', 'ok');
@@ -63,9 +53,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/onchain" element={<OnchainWalletPage />} />
           <Route path="/keys" element={<KeysPage />} />
-          <Route path="/backup" element={<UtexoBackupPage />} />
-          <Route path="/utexo-wallet" element={<UtexoWalletPage />} />
-          <Route path="/lsp-apay" element={<LspApayPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </BrowserRouter>

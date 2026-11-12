@@ -16,10 +16,9 @@ The primary `/onchain` screen uses the local, unpublished `@utexo/rgb-sdk`
 facade over the local `@utexo/rgb-sdk-web` `RgbLibWeb` engine (`RGB_L1`). Its
 shared contract and key helpers come from `@utexo/rgb-sdk-core`.
 
-The existing `/utexo-wallet`, `/lsp-apay`, `/backup` screens still use the
-registry RLN SDK, pinned under `@utexo/rgb-sdk-web-legacy`. Never change these
-imports to the new package: the new engine has no Lightning or begin/sign/end
-API. `@utexo/rgb-sdk-core-legacy` is the matching old core for those flows.
+This is an on-chain-only app. Do not add the old RLN SDK, Lightning/LSP/APay
+screens, begin/sign/end flows or legacy package aliases. File and VSS backup
+controls are part of the on-chain wallet screen.
 
 ## Lifecycle and persistence
 
@@ -27,8 +26,7 @@ API. `@utexo/rgb-sdk-core-legacy` is the matching old core for those flows.
 and calls `init()` only, closing the instance on failed initialization. The
 facade owns the engine. Do not init/destroy `wallet.engine` independently.
 
-`src/store.ts` owns live instances, wrapped for activity logging. `onchain`
-entries have a separate config and type from legacy `utexo`/`rln` entries.
+`src/store.ts` owns live on-chain instances, wrapped for activity logging.
 Each new profile gets a unique stable `dataDir`. `src/lib/session.ts` saves
 configuration to localStorage and active selection to sessionStorage/URL.
 Reload reopens the same profile. Do not reinterpret legacy state or discard
@@ -43,14 +41,13 @@ appear in activity logs. This sandbox stores mnemonics in localStorage.
 
 Resolve installed tarball packages; do not add sibling source aliases that
 make TypeScript, Vite and clean installs use different SDK versions. Keep
-`@utexo/rgb-sdk-web`, `@utexo/rgb-lib-wasm`, `@utexo/rgb-sdk-web-legacy` and
-`@utexo/rln-wasm` out of Vite dependency optimization. Legacy dependencies
-still need node polyfills, WASM and top-level-await plugins, in that order
-before React. Keep the RGB_L1 stand proxies separate from legacy LSP proxies.
+`@utexo/rgb-sdk-web` and `@utexo/rgb-lib-wasm` out of Vite dependency
+optimization. The WASM URL is handled by Vite directly; no Node polyfills,
+WASM or top-level-await plugins are needed. Development proxies serve
+Esplora, the RGB proxy and VSS for the RGB_L1 stand.
 
 ## UI
 
 Reuse `Section`, `Field`, `Btn`, `OutputBox` and existing colors. The on-chain
-page uses typed facade calls and engine backup extensions. Legacy pages keep
-their existing workflows. Browser tests use real WASM and IndexedDB without
+page uses typed facade calls and engine backup extensions. Browser tests use real WASM and IndexedDB without
 requiring external services; funded network flows need a separate live stand.
