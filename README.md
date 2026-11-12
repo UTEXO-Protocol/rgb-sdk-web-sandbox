@@ -20,7 +20,9 @@ SHA-256 checksums; the lockfile pins their npm integrity hashes.
 
 The on-chain screen provides wallet creation, balances, UTXOs, NIA/IFA issuance,
 BTC/RGB sends, witness/blinded invoices, transfers, encrypted file backups and
-VSS. Blank mnemonic generates a new wallet. Amounts are in sats or the asset's
+VSS. The sticky left menu links to numbered operation sections, with a section
+picker on small screens. Each section keeps its own result; receive, send and
+asset lookup forms have independent values. Blank mnemonic generates a new wallet. Amounts are in sats or the asset's
 smallest units; fees are in sat/vB. A receive invoice for a specific asset
 requires an explicit amount in the form. Leave both asset ID and amount blank
 for an open invoice; when sending a fixed-amount invoice, the amount can be
@@ -82,10 +84,14 @@ same-origin development proxies below, for an existing RGB_L1 stand:
 | `VITE_RGB_L1_PROXY_URL` | `/rgb-l1-proxy/json-rpc` | Browser-facing RGB proxy |
 | `VITE_RGB_L1_INDEXER_TARGET` | `http://127.0.0.1:8094` | Vite Esplora upstream |
 | `VITE_RGB_L1_PROXY_TARGET` | `http://127.0.0.1:3002` | Vite RGB proxy upstream |
+| `VITE_RGB_L1_HELPER_TARGET` | `http://127.0.0.1:8080` | Vite `/rgb-l1-regtest` faucet upstream |
 | `VITE_RGB_L1_VSS_TARGET` | `http://127.0.0.1:8181` | Vite `/vss` upstream |
 
 The new engine's `rgb-lib-wasm@1.0.0-beta.4` needs RGB proxy protocol 1.0
-(rgb-proxy-server 0.4.0+). Fund and mine through the RGB_L1 stand's own helper.
+(rgb-proxy-server 0.4.0+). The Fund Wallet section uses the stand's helper to
+fund a regtest wallet and mine its confirmations. For other networks, it shows
+the wallet's receive address for external funding. Mine further blocks through
+the RGB_L1 stand's helper when confirming sends or allocation transactions.
 Enter `/vss` in the wallet creation form to use the local VSS proxy, or an
 absolute URL for another server; blank keeps cloud backups disabled.
 

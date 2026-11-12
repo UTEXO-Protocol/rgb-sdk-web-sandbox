@@ -11,6 +11,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
+        '/rgb-l1-regtest': {
+          target: env.VITE_RGB_L1_HELPER_TARGET || 'http://127.0.0.1:8080',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/rgb-l1-regtest/, ''),
+        },
         '/rgb-l1-esplora': {
           target: env.VITE_RGB_L1_INDEXER_TARGET || 'http://127.0.0.1:8094',
           changeOrigin: true,

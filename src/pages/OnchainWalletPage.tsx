@@ -9,6 +9,7 @@ import { Section } from '../components/Section';
 import { Field, inputCls, selectCls, textareaCls } from '../components/Field';
 import { Btn } from '../components/Btn';
 import { OutputBox } from '../components/OutputBox';
+import { WalletSections, type WalletSectionId } from '../components/WalletSections';
 
 const networks: Network[] = ['testnet', 'testnet4', 'signet', 'regtest', 'utexo', 'mainnet'];
 
@@ -57,10 +58,18 @@ export function OnchainWalletPage() {
     }
   }
 
-  return <div>
-    <h1 className="text-[#58a6ff] text-2xl font-bold mb-1">RGB On-chain Wallet</h1>
-    <p className="text-[#8b949e] text-sm mb-6">UTEXOWallet + RgbLibWeb · Bitcoin and RGB assets · RGB_L1</p>
-    <Section title="Create / restore wallet" hint="Each profile has its own wallet storage. Keep the mnemonic and a wallet backup to recover RGB assets. Demo sessions store the mnemonic in this browser.">
+  return <div className="sm:flex items-start gap-6">
+    <WalletSections />
+    <div className="flex-1 min-w-0">
+    <h1 className="text-[#58a6ff] text-2xl font-bold mb-1">UTEXOWallet</h1>
+    <p className="text-[#8b949e] text-sm mb-6">Create, fund, issue assets and send or receive Bitcoin and RGB.
+      <span className="inline-block ml-2 mt-1 text-xs px-2 py-0.5 rounded bg-[#161b22] border border-[#30363d]">On-chain · RGB_L1</span>
+    </p>
+    <div className="flex items-center gap-3 mb-4">
+      <h2 className="text-sm font-bold uppercase tracking-widest">Onchain</h2>
+      <div className="flex-1 h-px bg-[#30363d]" />
+    </div>
+    <Section id="sec-create" title="1. Create / restore wallet" hint="Each profile has its own wallet storage. Keep the mnemonic and a wallet backup to recover RGB assets. Demo sessions store the mnemonic in this browser.">
       <div className="grid md:grid-cols-2 gap-x-4">
         <Input label="Wallet label" value={label} onChange={setLabel} />
         <Field label="Network"><select aria-label="Network" value={network} className={selectCls} onChange={(e) => {
@@ -81,138 +90,244 @@ export function OnchainWalletPage() {
       <Btn onClick={createWallet} disabled={busy || sdkStatus !== 'ready'}>{busy ? 'Opening…' : 'Open on-chain wallet'}</Btn>
       <OutputBox value={output} />
     </Section>
-    {active?.type === 'onchain'
-      ? <WalletOperations key={active.id} wallet={active.instance} id={active.id} label={active.label} />
-      : <p className="text-[#8b949e]">Create or select an on-chain wallet to use these operations.</p>}
+    <WalletOperations key={active?.id ?? 'no-wallet'} wallet={active?.instance ?? null} id={active?.id ?? null} label={active?.label} network={active?.config.network} />
+    </div>
   </div>;
 }
 
-function WalletOperations({ wallet, id, label }: { wallet: OnchainWallet; id: string; label: string }) {
+type AssetForm = { ticker: string; name: string; precision: string; amounts: string };
+const initialAsset: AssetForm = { ticker: 'DEMO', name: 'Demo Asset', precision: '0', amounts: '1000' };
+
+function AssetFields({ value, onChange, prefix = '' }: {
+  value: AssetForm; onChange: (value: AssetForm) => void; prefix?: string;
+}) {
+  return <div className="grid md:grid-cols-2 gap-x-4">
+    <Input label={`${prefix}Ticker`} value={value.ticker} onChange={(ticker) => onChange({ ...value, ticker })} />
+    <Input label={`${prefix}Asset name`} value={value.name} onChange={(name) => onChange({ ...value, name })} />
+    <Input label={`${prefix}Precision`} value={value.precision} onChange={(precision) => onChange({ ...value, precision })} />
+    <Input label={`${prefix}Issue amounts (comma separated)`} value={value.amounts} onChange={(amounts) => onChange({ ...value, amounts })} />
+  </div>;
+}
+
+function WalletOperations({ wallet, id, label, network }: {
+  wallet: OnchainWallet | null; id: string | null; label?: string; network?: Network;
+}) {
   const [busy, setBusy] = useState(false);
-  const [output, setOutput] = useState('');
+  const [outputs, setOutputs] = useState<Partial<Record<WalletSectionId, string>>>({});
+  const [lastResult, setLastResult] = useState<WalletSectionId | null>(null);
   const [address, setAddress] = useState('');
   const [btcAmount, setBtcAmount] = useState('1000');
   const [feeRate, setFeeRate] = useState('2');
+  const [fundAmount, setFundAmount] = useState('1');
   const [utxoNum, setUtxoNum] = useState('5');
+  const [utxoFee, setUtxoFee] = useState('2');
   const [assetId, setAssetId] = useState('');
-  const [ticker, setTicker] = useState('DEMO');
-  const [name, setName] = useState('Demo Asset');
-  const [precision, setPrecision] = useState('0');
-  const [amounts, setAmounts] = useState('1000');
+  const [nia, setNia] = useState(initialAsset);
+  const [ifa, setIfa] = useState(initialAsset);
   const [inflation, setInflation] = useState('1000');
-  const [amount, setAmount] = useState('');
+  const [inflateAssetId, setInflateAssetId] = useState('');
+  const [inflateFee, setInflateFee] = useState('2');
+  const [receiveAssetId, setReceiveAssetId] = useState('');
+  const [receiveAmount, setReceiveAmount] = useState('');
   const [witness, setWitness] = useState(true);
+  const [sendAssetId, setSendAssetId] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [sendFee, setSendFee] = useState('2');
   const [invoice, setInvoice] = useState('');
+  const [decodeInvoice, setDecodeInvoice] = useState('');
   const [witnessSats, setWitnessSats] = useState('1000');
+  const [transferAssetId, setTransferAssetId] = useState('');
   const [password, setPassword] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [overwrite, setOverwrite] = useState(false);
   const [batchIdx, setBatchIdx] = useState('');
 
-  async function run(method: string, action: () => unknown | Promise<unknown>, online = false) {
+  async function run(section: WalletSectionId, method: string, action: (wallet: OnchainWallet) => unknown | Promise<unknown>, online = false) {
+    if (!wallet || !id || busy) return;
     setBusy(true);
+    setLastResult(section);
+    setOutputs((previous) => ({ ...previous, [section]: method + '\nRunning…' }));
     try {
-      const result = await action();
-      setOutput(method + '\n' + (result === undefined ? 'Done' : json(result)));
+      const result = await action(wallet);
+      setOutputs((previous) => ({ ...previous, [section]: method + '\n' + (result === undefined ? 'Done' : json(result)) }));
       if (online) useStore.getState().updateWallet(id, { online: true });
       useStore.getState().addLog(method + ' completed', 'ok');
     } catch (error) {
-      setOutput(method + '\nError: ' + error);
+      setOutputs((previous) => ({ ...previous, [section]: method + '\nError: ' + error }));
       useStore.getState().addLog(method + ': ' + error, 'err');
     } finally {
       setBusy(false);
     }
   }
 
-  const issue = { ticker, name, precision: Number(precision), amounts: parseAmounts(amounts) };
+  function result(section: WalletSectionId) {
+    return <div role={lastResult === section ? 'status' : undefined} aria-live={lastResult === section ? 'polite' : 'off'}>
+      <OutputBox label="Operation result" value={outputs[section] ?? ''} />
+    </div>;
+  }
+
+  const issueParams = (form: AssetForm) => ({ ...form, precision: Number(form.precision), amounts: parseAmounts(form.amounts) });
+
   return <>
-    <Section title={`Active: ${label}`} hint="Opening and offline reads leave the backup restore window open. Connect, sync or an online operation closes it until the wallet is reopened.">
-      <div className="flex flex-wrap gap-2">
-        <Btn disabled={busy} onClick={() => run('unlock', () => wallet.unlock(), true)}>Connect</Btn>
-        <Btn disabled={busy} onClick={() => run('getAddress', () => wallet.getAddress())}>Get address</Btn>
-        <Btn disabled={busy} onClick={() => run('getWalletIdentity', () => wallet.getWalletIdentity())}>Wallet identity</Btn>
-        <Btn disabled={busy} onClick={() => run('getNetworkInfo', () => wallet.getNetworkInfo())}>Network info</Btn>
-        <Btn disabled={busy} onClick={() => run('getBtcBalance', () => wallet.getBtcBalance(), true)}>BTC balance</Btn>
-        <Btn disabled={busy} onClick={() => run('getBtcBalance (offline)', () => wallet.getBtcBalance({ skipSync: true }))}>Cached balance</Btn>
-        <Btn disabled={busy} onClick={() => run('listUnspents', () => wallet.listUnspents(), true)}>Unspents</Btn>
-        <Btn disabled={busy} onClick={() => run('listTransactions', () => wallet.listTransactions(), true)}>Transactions</Btn>
-        <Btn disabled={busy} onClick={() => run('syncWallet', () => wallet.syncWallet(), true)}>Sync</Btn>
-        <Btn disabled={busy} onClick={() => run('refresh', () => wallet.refresh(), true)}>Refresh transfers</Btn>
-        <Btn disabled={busy} onClick={() => run('estimateFeeRate', () => wallet.estimateFeeRate(6), true)}>Estimate fee (6 blocks)</Btn>
-      </div>
-      <div role="status" aria-live="polite"><OutputBox label="Operation result" value={output} /></div>
-    </Section>
-    <fieldset disabled={busy}>
-      <Section title="Bitcoin" hint="Amounts are in sats; fee rate is in sat/vB. The wallet signs and broadcasts in one call.">
-        <div className="grid md:grid-cols-3 gap-x-4">
-          <Input label="BTC recipient address" value={address} onChange={setAddress} />
+    {wallet ? <div className="bg-[#0d2818] border border-[#238636] rounded-lg p-4 mb-6 flex items-center justify-between gap-3 flex-wrap">
+      <h2 className="font-semibold text-[#3fb950]">Active: {label}</h2>
+      <span className="text-xs text-[#8b949e]">{network} · RGB_L1</span>
+    </div> : <p className="text-sm text-[#d29922] mb-6">Create or select a wallet to enable the operations below.</p>}
+    <fieldset disabled={busy || !wallet} className="min-w-0">
+      <Section id="sec-online" title="2. Connect" hint="Connect to the indexer before online operations. Restore a backup first if needed; connecting closes the restore window until you reopen the wallet.">
+        <Btn onClick={() => run('online', 'unlock', (w) => w.unlock(), true)}>Connect</Btn>
+        {result('online')}
+      </Section>
+      <Section id="sec-info" title="3. Wallet Info" hint="Read the receive address, Bitcoin balances and UTXOs. Cached balance reads local state without connecting.">
+        <div className="flex flex-wrap gap-2">
+          <Btn onClick={() => run('info', 'getAddress', (w) => w.getAddress())}>Get address</Btn>
+          <Btn onClick={() => run('info', 'getBtcBalance', (w) => w.getBtcBalance(), true)}>BTC balance</Btn>
+          <Btn variant="secondary" onClick={() => run('info', 'getBtcBalance (offline)', (w) => w.getBtcBalance({ skipSync: true }))}>Cached balance</Btn>
+          <Btn variant="secondary" onClick={() => run('info', 'listUnspents', (w) => w.listUnspents(), true)}>Unspents</Btn>
+          <Btn variant="secondary" onClick={() => run('info', 'getNetworkInfo', (w) => w.getNetworkInfo())}>Network info</Btn>
+          <Btn variant="secondary" onClick={() => run('info', 'estimateFeeRate', (w) => w.estimateFeeRate(6), true)}>Estimate fee (6 blocks)</Btn>
+        </div>
+        {result('info')}
+      </Section>
+      <Section id="sec-fund" title="4. Fund Wallet" hint="Send Bitcoin to this wallet's receive address before issuing assets or making transfers. On regtest, the local faucet funds the wallet and mines confirmations.">
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Btn variant="secondary" onClick={() => run('fund', 'getAddress', (w) => w.getAddress())}>Get funding address</Btn>
+        </div>
+        <Input label="Regtest funding amount (BTC)" value={fundAmount} onChange={setFundAmount} />
+        <Btn disabled={network !== 'regtest'} onClick={() => run('fund', 'fundWallet', async (w) => {
+          if (network !== 'regtest') throw new Error('The local faucet is only available on regtest');
+          const amount = fundAmount.trim();
+          if (!/^\d+(\.\d{1,8})?$/.test(amount) || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+            throw new Error('Enter a positive BTC amount with at most 8 decimal places');
+          }
+          const address = await w.getAddress();
+          const response = await fetch('/rgb-l1-regtest/fund', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ address, amount }), signal: AbortSignal.timeout(30_000),
+          });
+          if (!response.ok) throw new Error(`Regtest faucet: HTTP ${response.status}`);
+          return response.json();
+        })}>Fund regtest wallet</Btn>
+        {network !== 'regtest' && <p className="text-xs text-[#8b949e] mt-3">Use an external faucet or send BTC to the funding address on {network ?? 'your chosen network'}.</p>}
+        {result('fund')}
+      </Section>
+      <Section id="sec-send-btc" title="5. Send BTC" hint="The wallet signs and broadcasts in one call. Amount is in sats; fee rate is in sat/vB.">
+        <Input label="BTC recipient address" value={address} onChange={setAddress} />
+        <div className="grid md:grid-cols-2 gap-x-4">
           <Input label="BTC amount (sats)" value={btcAmount} onChange={setBtcAmount} />
           <Input label="Fee rate (sat/vB)" value={feeRate} onChange={setFeeRate} />
         </div>
-        <Btn onClick={() => run('sendBtc', () => wallet.sendBtc({ address, amount: Number(btcAmount), feeRate: Number(feeRate) }), true)}>Send BTC</Btn>
-        <div className="mt-4"><Input label="Number of allocation UTXOs" value={utxoNum} onChange={setUtxoNum} /></div>
-        <Btn onClick={() => run('createUtxos', () => wallet.createUtxos({ num: Number(utxoNum), feeRate: Number(feeRate) }), true)}>Create UTXOs</Btn>
+        <Btn onClick={() => run('send-btc', 'sendBtc', (w) => w.sendBtc({ address, amount: Number(btcAmount), feeRate: Number(feeRate) }), true)}>Send BTC</Btn>
+        {result('send-btc')}
       </Section>
-      <Section title="Assets" hint="Create allocation UTXOs and let them confirm before issuing. Asset amounts are in the smallest units.">
-        <Input label="Asset ID (blank lists all transfers)" value={assetId} onChange={setAssetId} />
-        <div className="flex gap-2 flex-wrap mb-4">
-          <Btn onClick={() => run('listAssets', () => wallet.listAssets())}>List assets</Btn>
-          <Btn disabled={!assetId.trim()} onClick={() => run('getAssetBalance', () => wallet.getAssetBalance(assetId.trim()))}>Asset balance</Btn>
-          <Btn onClick={() => run('listTransfers', () => wallet.listTransfers(assetId.trim() || undefined))}>List transfers</Btn>
+      <Section id="sec-utxos" title="6. Create UTXOs" hint="Create colorable UTXOs for RGB allocations. Wait for confirmation before issuing assets or creating blinded invoices.">
+        <div className="grid md:grid-cols-2 gap-x-4">
+          <Input label="Number of allocation UTXOs" value={utxoNum} onChange={setUtxoNum} />
+          <Input label="UTXO fee rate (sat/vB)" value={utxoFee} onChange={setUtxoFee} />
         </div>
-        <div className="grid md:grid-cols-3 gap-x-4">
-          <Input label="Ticker" value={ticker} onChange={setTicker} />
-          <Input label="Asset name" value={name} onChange={setName} />
-          <Input label="Precision" value={precision} onChange={setPrecision} />
-          <Input label="Issue amounts (comma separated)" value={amounts} onChange={setAmounts} />
-          <Input label="Inflation amounts (comma separated)" value={inflation} onChange={setInflation} />
+        <Btn onClick={() => run('utxos', 'createUtxos', (w) => w.createUtxos({ num: Number(utxoNum), feeRate: Number(utxoFee) }), true)}>Create UTXOs</Btn>
+        {result('utxos')}
+      </Section>
+      <Section id="sec-sync" title="7. Sync" hint="Sync updates Bitcoin and UTXO state. Refresh advances pending RGB transfers; run it on both wallets until a transfer is Settled.">
+        <div className="flex flex-wrap gap-2">
+          <Btn onClick={() => run('sync', 'syncWallet', (w) => w.syncWallet(), true)}>Sync</Btn>
+          <Btn variant="secondary" onClick={() => run('sync', 'refresh', (w) => w.refresh(), true)}>Refresh transfers</Btn>
         </div>
+        {result('sync')}
+      </Section>
+      <Section id="sec-nia" title="8. Issue NIA Asset" hint="Issue a non-inflatable asset with a fixed supply. Amounts are in the asset's smallest units.">
+        <AssetFields value={nia} onChange={setNia} />
+        <Btn onClick={() => run('nia', 'issueAssetNia', (w) => w.issueAssetNia(issueParams(nia)))}>Issue NIA</Btn>
+        {result('nia')}
+      </Section>
+      <Section id="sec-ifa" title="9. Issue / Inflate IFA Asset" hint="Issue an inflatable asset or increase its supply using an existing inflation allocation.">
+        <AssetFields value={ifa} onChange={setIfa} prefix="IFA " />
+        <Input label="Inflation amounts (comma separated)" value={inflation} onChange={setInflation} />
+        <Btn onClick={() => run('ifa', 'issueAssetIfa', (w) => w.issueAssetIfa({ ...issueParams(ifa), inflationAmounts: parseAmounts(inflation), rejectListUrl: null }))}>Issue IFA</Btn>
+        <div className="grid md:grid-cols-2 gap-x-4 mt-5 pt-5 border-t border-[#30363d]">
+          <Input label="Asset ID to inflate" value={inflateAssetId} onChange={setInflateAssetId} />
+          <Input label="Inflation fee rate (sat/vB)" value={inflateFee} onChange={setInflateFee} />
+        </div>
+        <Btn variant="secondary" disabled={!inflateAssetId.trim()} onClick={() => run('ifa', 'inflate', (w) => w.inflate({ assetId: inflateAssetId.trim(), inflationAmounts: parseAmounts(inflation), feeRate: Number(inflateFee) }), true)}>Inflate IFA</Btn>
+        {result('ifa')}
+      </Section>
+      <Section id="sec-assets" title="10. List Assets" hint="List this wallet's assets or inspect the settled, future and spendable balance of one asset.">
+        <Input label="Asset ID for balance" value={assetId} onChange={setAssetId} />
         <div className="flex gap-2 flex-wrap">
-          <Btn onClick={() => run('issueAssetNia', () => wallet.issueAssetNia(issue))}>Issue NIA</Btn>
-          <Btn onClick={() => run('issueAssetIfa', () => wallet.issueAssetIfa({ ...issue, inflationAmounts: parseAmounts(inflation), rejectListUrl: null }))}>Issue IFA</Btn>
-          <Btn disabled={!assetId.trim()} onClick={() => run('inflate', () => wallet.inflate({ assetId: assetId.trim(), inflationAmounts: parseAmounts(inflation), feeRate: Number(feeRate) }), true)}>Inflate IFA</Btn>
+          <Btn onClick={() => run('assets', 'listAssets', (w) => w.listAssets())}>List assets</Btn>
+          <Btn variant="secondary" disabled={!assetId.trim()} onClick={() => run('assets', 'getAssetBalance', (w) => w.getAssetBalance(assetId.trim()))}>Asset balance</Btn>
         </div>
+        {result('assets')}
       </Section>
-      <Section title="Receive / send RGB" hint="A witness invoice needs no existing UTXO. A blinded invoice needs a free allocation UTXO. Refresh both wallets until the transfer is Settled.">
-        <Input label="RGB amount (smallest units)" value={amount} onChange={setAmount} />
-        <p className="text-sm text-[#8b949e] mb-4">To receive a specific asset, enter its amount. Leave both Asset ID and amount blank for an open invoice. When sending a fixed-amount invoice, you can leave the amount blank.</p>
-        <label className="block mb-4"><input type="checkbox" checked={witness} onChange={(e) => setWitness(e.target.checked)} /> Witness invoice</label>
-        <Btn disabled={Boolean(assetId.trim()) && !amount.trim()} onClick={() => run('onchainReceive', async () => {
-          const result = await wallet.onchainReceive({ assetId: assetId.trim() || undefined, amount: amount.trim() ? Number(amount) : undefined, witness, minConfirmations: 1 });
-          setInvoice(result.invoice);
-          return result;
-        }, true)}>Create RGB invoice</Btn>
-        <div className="mt-4"><Field label="RGB invoice"><textarea aria-label="RGB invoice" className={textareaCls} value={invoice} onChange={(e) => setInvoice(e.target.value)} /></Field></div>
-        <Input label="Witness output (sats; blank for blinded invoice)" value={witnessSats} onChange={setWitnessSats} />
-        <div className="flex gap-2 flex-wrap">
-          <Btn onClick={() => run('decodeRGBInvoice', () => wallet.decodeRGBInvoice({ invoice: invoice.trim() }))}>Decode invoice</Btn>
-          <Btn onClick={() => run('onchainSend', () => wallet.onchainSend({
-            invoice: invoice.trim(), assetId: assetId.trim() || undefined,
-            amount: amount.trim() ? Number(amount) : undefined, feeRate: Number(feeRate), minConfirmations: 1,
-            witnessData: witnessSats.trim() ? { amountSat: Number(witnessSats) } : undefined,
-          }), true)}>Send RGB</Btn>
+      <Section id="sec-receive" title="11. Receive RGB Assets" hint="A witness invoice needs no existing UTXO. A blinded invoice needs a free allocation UTXO. Share the complete invoice with the sender.">
+        <div className="grid md:grid-cols-2 gap-x-4">
+          <Input label="Receive asset ID (optional)" value={receiveAssetId} onChange={setReceiveAssetId} />
+          <Input label="Receive amount (smallest units)" value={receiveAmount} onChange={setReceiveAmount} />
         </div>
-        <div className="mt-4"><Input label="Batch transfer index to fail" value={batchIdx} onChange={setBatchIdx} /></div>
-        <Btn variant="danger" disabled={!batchIdx.trim()} onClick={() => run('failTransfers', () => wallet.failTransfers({ batchTransferIdx: Number(batchIdx), noAssetOnly: false }), true)}>Fail transfer</Btn>
+        <p className="text-sm text-[#8b949e] mb-4">For a specific asset, enter its amount. Leave both fields blank for an open invoice.</p>
+        <label className="block text-sm mb-4"><input type="checkbox" checked={witness} onChange={(e) => setWitness(e.target.checked)} /> Witness invoice</label>
+        <Btn disabled={Boolean(receiveAssetId.trim()) && !receiveAmount.trim()} onClick={() => run('receive', 'onchainReceive', (w) => w.onchainReceive({
+          assetId: receiveAssetId.trim() || undefined,
+          amount: receiveAmount.trim() ? Number(receiveAmount) : undefined,
+          witness, minConfirmations: 1,
+        }), true)}>Create RGB invoice</Btn>
+        {result('receive')}
       </Section>
-      <Section title="Backup / restore" hint="Restore after opening, before Connect or online operations. To restore into a fresh profile, create another wallet with the same mnemonic. Existing state requires explicit overwrite.">
+      <Section id="sec-send-rgb" title="12. Send RGB Assets" hint="Paste the recipient's RGB invoice. For an open invoice, enter the asset ID and amount. If the invoice already contains them, the fields may stay blank. A witness invoice also needs an output amount in sats.">
+        <Field label="RGB invoice"><textarea aria-label="RGB invoice" className={textareaCls} value={invoice} onChange={(e) => setInvoice(e.target.value)} /></Field>
+        <div className="grid md:grid-cols-2 gap-x-4">
+          <Input label="Send asset ID (optional)" value={sendAssetId} onChange={setSendAssetId} />
+          <Input label="RGB amount (smallest units)" value={sendAmount} onChange={setSendAmount} />
+          <Input label="RGB fee rate (sat/vB)" value={sendFee} onChange={setSendFee} />
+          <Input label="Witness output (sats; blank for blinded invoice)" value={witnessSats} onChange={setWitnessSats} />
+        </div>
+        <Btn onClick={() => run('send-rgb', 'onchainSend', (w) => w.onchainSend({
+          invoice: invoice.trim(), assetId: sendAssetId.trim() || undefined,
+          amount: sendAmount.trim() ? Number(sendAmount) : undefined, feeRate: Number(sendFee), minConfirmations: 1,
+          witnessData: witnessSats.trim() ? { amountSat: Number(witnessSats) } : undefined,
+        }), true)}>Send RGB</Btn>
+        {result('send-rgb')}
+      </Section>
+      <Section id="sec-transfers" title="13. Transactions & Transfers" hint="Inspect Bitcoin transactions and RGB transfer history. An empty asset filter lists all transfers.">
+        <Input label="Asset ID (blank lists all transfers)" value={transferAssetId} onChange={setTransferAssetId} />
+        <div className="flex gap-2 flex-wrap mb-5">
+          <Btn onClick={() => run('transfers', 'listTransactions', (w) => w.listTransactions(), true)}>Transactions</Btn>
+          <Btn variant="secondary" onClick={() => run('transfers', 'listTransfers', (w) => w.listTransfers(transferAssetId.trim() || undefined))}>List transfers</Btn>
+        </div>
+        <Input label="Batch transfer index to fail" value={batchIdx} onChange={setBatchIdx} />
+        <Btn variant="danger" disabled={!batchIdx.trim()} onClick={() => run('transfers', 'failTransfers', (w) => w.failTransfers({ batchTransferIdx: Number(batchIdx), noAssetOnly: false }), true)}>Fail transfer</Btn>
+        {result('transfers')}
+      </Section>
+      <Section id="sec-keys" title="14. Wallet Keys" hint="Inspect the active wallet's public identity and network. Use the Keys page in the top menu to generate or validate a mnemonic.">
+        <Btn onClick={() => run('keys', 'getWalletIdentity', (w) => w.getWalletIdentity())}>Wallet identity</Btn>
+        {result('keys')}
+      </Section>
+      <Section id="sec-decode" title="15. Decode RGB Invoice" hint="Inspect an invoice's network, recipient and asset details before sending.">
+        <Field label="Invoice to decode"><textarea aria-label="Invoice to decode" className={textareaCls} value={decodeInvoice} onChange={(e) => setDecodeInvoice(e.target.value)} /></Field>
+        <Btn onClick={() => run('decode', 'decodeRGBInvoice', (w) => w.decodeRGBInvoice({ invoice: decodeInvoice.trim() }))}>Decode invoice</Btn>
+        {result('decode')}
+      </Section>
+      <Section id="sec-backup" title="16. Backup / Restore" hint="Restore after opening, before Connect or online operations. For a fresh profile, create another wallet with the same mnemonic. Existing state requires explicit overwrite.">
         <Input label="Backup password" type="password" value={password} onChange={setPassword} />
-        <Field label="Backup file"><input aria-label="Backup file" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
-        <label className="block mb-4"><input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} /> Overwrite existing wallet state when restoring</label>
+        <Field label="Backup file"><input aria-label="Backup file" type="file" className="w-full min-w-0 text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
+        <label className="block text-sm mb-4"><input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} /> Overwrite existing wallet state when restoring</label>
         <div className="flex gap-2 flex-wrap">
-          <Btn disabled={!password} onClick={() => run('exportBackup', async () => {
-            const bytes = await wallet.exportBackup({ password });
+          <Btn disabled={!password} onClick={() => run('backup', 'exportBackup', async (w) => {
+            const bytes = await w.exportBackup({ password });
             downloadBytes(bytes, `rgb-l1-${id}.backup`);
             return { bytes: bytes.length, downloaded: true };
           })}>Download backup</Btn>
-          <Btn disabled={!password || !file} onClick={() => run('restoreBackup', async () => {
+          <Btn variant="secondary" disabled={!password || !file} onClick={() => run('backup', 'restoreBackup', async (w) => {
             if (!file) throw new Error('Choose a backup file');
-            await wallet.restoreBackup({ bytes: new Uint8Array(await file.arrayBuffer()), password, overwrite });
+            await w.restoreBackup({ bytes: new Uint8Array(await file.arrayBuffer()), password, overwrite });
           })}>Restore file</Btn>
-          <Btn onClick={() => run('backupToVss', () => wallet.backupToVss())}>Back up to VSS</Btn>
-          <Btn onClick={() => run('getVssBackupInfo', () => wallet.getVssBackupInfo())}>VSS backup info</Btn>
-          <Btn onClick={() => run('restoreFromVss', () => wallet.restoreFromVss({ overwrite }))}>Restore from VSS</Btn>
         </div>
+        <div className="flex gap-2 flex-wrap mt-5 pt-5 border-t border-[#30363d]">
+          <Btn onClick={() => run('backup', 'backupToVss', (w) => w.backupToVss())}>Back up to VSS</Btn>
+          <Btn variant="secondary" onClick={() => run('backup', 'getVssBackupInfo', (w) => w.getVssBackupInfo())}>VSS backup info</Btn>
+          <Btn variant="secondary" onClick={() => run('backup', 'restoreFromVss', (w) => w.restoreFromVss({ overwrite }))}>Restore from VSS</Btn>
+        </div>
+        {result('backup')}
       </Section>
     </fieldset>
   </>;

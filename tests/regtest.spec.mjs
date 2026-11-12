@@ -81,9 +81,11 @@ test('regtest: funded BTC, UTXOs, NIA witness/blinded transfers and IFA inflatio
   try {
     const senderAddress = await open(sender, 'Alice regtest');
     const receiverAddress = await open(receiver, 'Bob regtest');
-    for (const address of [senderAddress, receiverAddress]) {
+    for (const [page, address] of [[sender, senderAddress], [receiver, receiverAddress]]) {
       expect(address).toMatch(/^bcrt1p/);
-      const { height } = await fetchJson(`${helper}/fund`, { address, amount: '1.0' });
+      const { height } = process.env.RGB_E2E_HELPER
+        ? await fetchJson(`${helper}/fund`, { address, amount: '1.0' })
+        : await action(page, 'Fund regtest wallet', 'fundWallet');
       await indexed(height);
     }
     expect((await action(sender, 'BTC balance', 'getBtcBalance')).vanilla.settled).toBe(100_000_000);
@@ -113,17 +115,22 @@ test('regtest: funded BTC, UTXOs, NIA witness/blinded transfers and IFA inflatio
     const nia = await action(sender, 'Issue NIA', 'issueAssetNia');
     expect(nia.balance.settled).toBe(1000);
     await sender.getByLabel('Asset ID (blank lists all transfers)', { exact: true }).fill(nia.assetId);
+    await sender.getByLabel('Asset ID for balance', { exact: true }).fill(nia.assetId);
+    await sender.getByLabel('Send asset ID (optional)', { exact: true }).fill(nia.assetId);
+    await receiver.getByLabel('Asset ID for balance', { exact: true }).fill(nia.assetId);
     let transferred = 0;
     for (const witness of [true, false]) {
       await receiver.getByRole('checkbox', { name: 'Witness invoice', exact: true }).setChecked(witness);
       if (!witness) {
         // A named asset requires an explicit receive amount; no unusable invoice.
+        await receiver.getByLabel('Receive asset ID (optional)', { exact: true }).fill(nia.assetId);
         await expect(receiver.getByRole('button', { name: 'Create RGB invoice', exact: true })).toBeDisabled();
-        await receiver.getByLabel('RGB amount (smallest units)', { exact: true }).fill('100');
+        await receiver.getByLabel('Receive amount (smallest units)', { exact: true }).fill('100');
       }
       const invoice = await action(receiver, 'Create RGB invoice', 'onchainReceive');
       expect(invoice.recipientId).toContain(witness ? 'wvout:' : 'utxob:');
       await sender.getByLabel('RGB invoice', { exact: true }).fill(invoice.invoice);
+      await sender.getByLabel('Invoice to decode', { exact: true }).fill(invoice.invoice);
       expect((await action(sender, 'Decode invoice', 'decodeRGBInvoice')).network).toBe('regtest');
       await sender.getByLabel('RGB amount (smallest units)', { exact: true }).fill('100');
       await sender.getByLabel('Witness output (sats; blank for blinded invoice)', { exact: true }).fill(witness ? '1000' : '');
@@ -137,7 +144,8 @@ test('regtest: funded BTC, UTXOs, NIA witness/blinded transfers and IFA inflatio
 
     const ifa = await action(sender, 'Issue IFA', 'issueAssetIfa');
     expect(ifa.initialSupply).toBe(1000);
-    await sender.getByLabel('Asset ID (blank lists all transfers)', { exact: true }).fill(ifa.assetId);
+    await sender.getByLabel('Asset ID to inflate', { exact: true }).fill(ifa.assetId);
+    await sender.getByLabel('Asset ID for balance', { exact: true }).fill(ifa.assetId);
     await sender.getByLabel('Inflation amounts (comma separated)', { exact: true }).fill('200');
     const inflated = await action(sender, 'Inflate IFA', 'inflate');
     for (let round = 0; round < 8; round++) {
@@ -152,6 +160,7 @@ test('regtest: funded BTC, UTXOs, NIA witness/blinded transfers and IFA inflatio
     await receiver.reload();
     await expect(receiver.getByRole('heading', { name: 'Active: Bob regtest', exact: true })).toBeVisible();
     await receiver.getByLabel('Asset ID (blank lists all transfers)', { exact: true }).fill(nia.assetId);
+    await receiver.getByLabel('Asset ID for balance', { exact: true }).fill(nia.assetId);
     expect((await action(receiver, 'Asset balance', 'getAssetBalance')).settled).toBe(200);
     const history = await action(receiver, 'List transfers', 'listTransfers');
     expect(history.filter((t) => t.status === 'Settled')).toHaveLength(2);

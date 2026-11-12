@@ -30,6 +30,9 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
   await expect(page.getByRole('status')).toContainText('vanilla');
   await page.getByRole('button', { name: 'List assets', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('nia');
+  // Results stay beside their own operations when another section is used.
+  await expect(page.locator('#sec-keys pre')).toHaveText(identity);
+  await expect(page.locator('#sec-info pre')).toContainText('vanilla');
 
   await page.getByLabel('Backup password', { exact: true }).fill('browser-test-backup');
   const downloading = page.waitForEvent('download');
@@ -95,6 +98,14 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
 
 test('failed initialization is recoverable and removed routes return home', async ({ page }) => {
   await page.goto('/onchain');
+  const sections = page.getByRole('navigation', { name: 'Wallet sections' });
+  await expect(sections).toBeVisible();
+  await sections.getByRole('button', { name: '5 · Send BTC', exact: true }).click();
+  await expect(page.locator('#sec-send-btc')).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Send BTC', exact: true })).toBeDisabled();
+  await expect(sections).toBeInViewport();
+  await expect(sections.locator('[aria-current="location"]')).toHaveText('5 · Send BTC');
+  await sections.getByRole('button', { name: '1 · Create wallet', exact: true }).click();
   await page.getByLabel('Mnemonic', { exact: true }).fill('invalid mnemonic');
   await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
   await expect(page.getByText(/Error:.*mnemonic/i).first()).toBeVisible();
@@ -103,7 +114,13 @@ test('failed initialization is recoverable and removed routes return home', asyn
   await page.getByLabel('Wallet label', { exact: true }).fill('Recovered');
   await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Active: Recovered', exact: true })).toBeVisible();
-  await expect(page.getByRole('navigation').getByRole('link')).toHaveText(['Home', 'On-chain Wallet', 'Keys']);
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link')).toHaveText(['Home', 'On-chain Wallet', 'Keys']);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('Jump to section', { exact: true }).selectOption('backup');
+  await expect(page.locator('#sec-backup')).toBeInViewport();
+  await expect(page.getByLabel('Jump to section', { exact: true })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('link', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('main').getByRole('link')).toHaveText([
     /On-chain Wallet/, /Keys/,

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import type { SdkLogEntry } from '../store';
 import { json } from '../lib/utils';
@@ -67,6 +67,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
+  const { pathname } = useLocation();
   const sdkStatus = useStore((s) => s.sdkStatus);
   const sdkError = useStore((s) => s.sdkError);
   const log = useStore((s) => s.log);
@@ -120,9 +121,9 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9]">
       <header className="border-b border-[#30363d] px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
           <span className="text-[#58a6ff] font-bold text-lg whitespace-nowrap">RGB SDK Demo</span>
-          <nav className="flex gap-4 flex-wrap">
+          <nav aria-label="Main navigation" className="flex gap-4 flex-wrap">
             {navLinks.map((l) => (
               <NavLink
                 key={l.to}
@@ -237,7 +238,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      <main className="max-w-4xl mx-auto px-6 py-8">{children}</main>
+      <main className={`${pathname === '/onchain' ? 'max-w-6xl' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 sm:py-8`}>{children}</main>
     </div>
   );
 }
