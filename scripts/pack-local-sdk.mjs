@@ -1,4 +1,4 @@
-// Build snapshots of the sibling checkouts. npm ci then needs no sibling paths.
+// Build the unpublished facade and web engine; core is installed from npm.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -11,7 +11,7 @@ mkdirSync(vendor, { recursive: true });
 const snapshots = [];
 const packageFile = path.join(root, 'package.json');
 const appPackage = JSON.parse(readFileSync(packageFile, 'utf8'));
-for (const repo of ['rgb-sdk-core', 'rgb-sdk', 'rgb-sdk-web']) {
+for (const repo of ['rgb-sdk', 'rgb-sdk-web']) {
   const cwd = path.resolve(root, '..', repo);
   const run = (bin, args) => execFileSync(bin, args, { cwd, encoding: 'utf8' }).trim();
   execFileSync('npm', ['run', 'build'], { cwd, stdio: 'inherit' });

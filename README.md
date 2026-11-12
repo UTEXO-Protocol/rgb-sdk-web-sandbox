@@ -6,9 +6,10 @@ On-chain browser playground for the unpublished `@utexo/rgb-sdk` facade and
 
 ## Run
 
-Use Node 22+ and npm. The compatible SDK packages are not published yet, so a
-fresh checkout first needs locally built SDK archives; follow **Local SDK
-changes** below to prepare them from the sibling repositories.
+Use Node 22+ and npm. Core is installed from npm as
+`@utexo/rgb-sdk-core@1.0.0-beta.10`. The facade and web engine are not published
+yet, so a fresh checkout first needs their locally built SDK archives; follow
+**Local SDK changes** below to prepare them from the sibling repositories.
 
 With those archives already prepared and matching the lockfile:
 
@@ -18,7 +19,7 @@ npm run dev
 ```
 
 Open http://localhost:5173/utexo-wallet. `vendor/*.tgz` contains local builds of
-`rgb-sdk-core`, `rgb-sdk`, and `rgb-sdk-web`; these archives are ignored by Git.
+`rgb-sdk` and `rgb-sdk-web`; these archives are ignored by Git.
 `vendor/sdk-snapshots.json` records their source commits and SHA-256 checksums;
 the lockfile pins their npm integrity hashes.
 
@@ -52,7 +53,6 @@ With these sibling checkouts and their development dependencies installed:
 
 ```text
 rgb-sdk-split/
-  rgb-sdk-core/
   rgb-sdk/
   rgb-sdk-web/
   rgb-sdk-web-sandbox/
@@ -72,7 +72,7 @@ alongside the source revisions. `sdk:pack` builds the sibling working trees;
 it does not change their source files, branches or dependency declarations.
 A snapshot records uncommitted changes if present. Restart Vite after repacking.
 
-Once compatible core, facade and web-engine versions are published, replace
+Once compatible facade and web-engine versions are published, replace
 the `file:vendor/...` dependencies with those npm versions, regenerate the
 lockfile, and remove the temporary packing script and snapshot manifest. Do
 not substitute the currently published legacy packages: they expose a
