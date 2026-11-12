@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "sdk:pack": "node scripts/pack-local-sdk.mjs",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:regtest": "RGB_SANDBOX_REGTEST=1 playwright test"
   },
   "dependencies": {
     "@utexo/rgb-sdk-web": "file:vendor/utexo-rgb-sdk-web-1.0.0.tgz",

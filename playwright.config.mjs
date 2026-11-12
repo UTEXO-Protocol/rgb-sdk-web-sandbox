@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: process.env.RGB_SANDBOX_REGTEST === '1' ? '**/regtest.spec.mjs' : '**/onchain.spec.mjs',
   timeout: 60_000,
   workers: 1,
   use: { headless: true, trace: 'retain-on-failure' },

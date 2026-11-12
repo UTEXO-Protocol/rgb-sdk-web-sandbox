@@ -174,9 +174,10 @@ function WalletOperations({ wallet, id, label }: { wallet: OnchainWallet; id: st
         </div>
       </Section>
       <Section title="Receive / send RGB" hint="A witness invoice needs no existing UTXO. A blinded invoice needs a free allocation UTXO. Refresh both wallets until the transfer is Settled.">
-        <Input label="RGB amount (blank accepts any amount)" value={amount} onChange={setAmount} />
+        <Input label="RGB amount (smallest units)" value={amount} onChange={setAmount} />
+        <p className="text-sm text-[#8b949e] mb-4">To receive a specific asset, enter its amount. Leave both Asset ID and amount blank for an open invoice. When sending a fixed-amount invoice, you can leave the amount blank.</p>
         <label className="block mb-4"><input type="checkbox" checked={witness} onChange={(e) => setWitness(e.target.checked)} /> Witness invoice</label>
-        <Btn onClick={() => run('onchainReceive', async () => {
+        <Btn disabled={Boolean(assetId.trim()) && !amount.trim()} onClick={() => run('onchainReceive', async () => {
           const result = await wallet.onchainReceive({ assetId: assetId.trim() || undefined, amount: amount.trim() ? Number(amount) : undefined, witness, minConfirmations: 1 });
           setInvoice(result.invoice);
           return result;

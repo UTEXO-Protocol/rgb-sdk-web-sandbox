@@ -21,7 +21,10 @@ SHA-256 checksums; the lockfile pins their npm integrity hashes.
 The on-chain screen provides wallet creation, balances, UTXOs, NIA/IFA issuance,
 BTC/RGB sends, witness/blinded invoices, transfers, encrypted file backups and
 VSS. Blank mnemonic generates a new wallet. Amounts are in sats or the asset's
-smallest units; fees are in sat/vB.
+smallest units; fees are in sat/vB. A receive invoice for a specific asset
+requires an explicit amount in the form. Leave both asset ID and amount blank
+for an open invoice; when sending a fixed-amount invoice, the amount can be
+omitted to use its encoded value.
 
 Wallet creation runs `init()` only. Connect or any online operation establishes
 the network connection. Restore backups **before** that connection. To restore
@@ -119,3 +122,32 @@ preservation of older session records, and removal of legacy routes. It needs no
 proxy or VSS server and does not test funded transactions or VSS service calls.
 
 Docker copies `vendor/` before `npm ci`; CI uses the same lockfile installation.
+
+### Regtest UI integration
+
+With the RGB_L1 stand running (bitcoind, Esplora on `:8094`, RGB proxy 0.4.0+
+on `:3002`, regtest helper on `:8080`) and the miner connected to Esplora's
+node, run:
+
+```sh
+npm run build
+npm run test:regtest
+```
+
+This separate suite drives the actual application UI in both dev and production
+preview. It funds two new wallets, sends BTC, creates allocation UTXOs, issues
+NIA, settles witness and blinded RGB transfers on both sides, issues/inflates
+IFA, and checks balances/history after a page reload. It mines and spends only
+local regtest funds. It does not exercise VSS.
+
+The stand must have at least 101 blocks and both Bitcoin nodes must be peers.
+For the existing `rgblibweb-e2e` Docker stand, reconnect peers after a restart:
+
+```sh
+docker exec rgblibweb-e2e-bitcoind-1 bitcoin-cli -regtest -rpcuser=user -rpcpassword=default_password addnode esplora:18444 add
+docker exec rgblibweb-e2e-esplora-1 cli addnode bitcoind:18444 add
+```
+
+A node already added needs no further change. `RGB_E2E_HELPER`,
+`RGB_E2E_INDEXER` and `RGB_E2E_PROXY_HTTP` override the test stand endpoints;
+without overrides the test exercises the app's default same-origin proxies.

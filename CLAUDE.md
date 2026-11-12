@@ -6,7 +6,9 @@
 - `npm run dev`: Vite on port 5173.
 - `npm run typecheck`: TypeScript.
 - `npm run build`: TypeScript and production build.
-- `npm run test:e2e`: Playwright against dev and production preview (build first).
+- `npm run test:e2e`: offline Playwright suite against dev and production preview (build first).
+- `npm run test:regtest`: funded BTC/RGB flows through the UI; needs the local
+  RGB_L1 stand and connected Bitcoin peers (see README).
 - `npm run sdk:pack`: build and pack sibling core/facade/web checkouts into `vendor/`.
   Follow with `npm install --force` and commit the snapshots, manifest and lockfile.
 
