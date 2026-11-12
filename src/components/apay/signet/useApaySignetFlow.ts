@@ -11,7 +11,7 @@
 //   - createLsp() auto-discovers the LSP peer from lspBaseUrl (GET /get_info)
 // Merchant never calls claimHodlInvoice — the LSP outbox delivers.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { UTEXOWallet, generateKeys, type UtexoLsp } from '@utexo/rgb-sdk-web';
+import { UTEXOWallet, generateKeys, type UtexoLsp } from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../../../store';
 import { DEMO_VSS_URL } from '../../../lib/utils';
 import {

@@ -3,10 +3,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY vendor ./vendor
 
-# The lockfile currently contains local file: dependencies.
-# npm install resolves dependencies from package.json for CI/container builds.
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build

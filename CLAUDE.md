@@ -1,66 +1,56 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Repository guide
 
 ## Commands
 
-```bash
-npm run dev       # Start Vite dev server on port 5173
-npm run build     # TypeScript check + Vite production build
-npm run preview   # Preview production build locally
-```
+- `npm ci`: install the locked dependencies, including the tracked SDK snapshots.
+- `npm run dev`: Vite on port 5173.
+- `npm run typecheck`: TypeScript.
+- `npm run build`: TypeScript and production build.
+- `npm run test:e2e`: Playwright against dev and production preview (build first).
+- `npm run sdk:pack`: build and pack sibling core/facade/web checkouts into `vendor/`.
+  Follow with `npm install --force` and commit the snapshots, manifest and lockfile.
 
-No test suite exists — this is a demo application.
+## SDKs
 
-## What This Is
+The primary `/onchain` screen uses the local, unpublished `@utexo/rgb-sdk`
+facade over the local `@utexo/rgb-sdk-web` `RgbLibWeb` engine (`RGB_L1`). Its
+shared contract and key helpers come from `@utexo/rgb-sdk-core`.
 
-Interactive React SPA that demos every function of the `@utexo/rgb-sdk-web` WASM library. The SDK is a local sibling package (`../rgb-sdk-web`), not from npm.
+The existing `/utexo-wallet`, `/lsp-apay`, `/backup` screens still use the
+registry RLN SDK, pinned under `@utexo/rgb-sdk-web-legacy`. Never change these
+imports to the new package: the new engine has no Lightning or begin/sign/end
+API. `@utexo/rgb-sdk-core-legacy` is the matching old core for those flows.
 
-## Architecture
+## Lifecycle and persistence
 
-The SDK is **RLN-only** (the old rgb-lib-wasm `WalletManager` stack was removed). All wallets are backed by `rln-wasm-sdk`.
+`src/lib/onchain.ts` constructs `new UTEXOWallet({ engine: new RgbLibWeb(config) })`
+and calls `init()` only, closing the instance on failed initialization. The
+facade owns the engine. Do not init/destroy `wallet.engine` independently.
 
-**Startup flow**: `App.tsx` calls `initRlnWasm()` (async WASM init), then `autoRestore()` to recover wallets from `localStorage`. The Zustand store in `src/store.ts` holds live wallet instances (`type: 'utexo' | 'rln'`, instance `UTEXOWallet | RlnWalletManager`) plus an activity log. Instances **must** live in Zustand (not React state) — WASM objects cannot be cloned/serialized. Both wallet types restore via `*.create({ mnemonic, password, network, indexerUrl?, transportEndpoint?, proxyUrl?, nodeRuntimeId? })`, so the saved `WalletConfig` must include `password`. `create()` auto-connects to the indexer (saved `indexerUrl` or the network default) non-fatally — check `isOnline()` afterwards; no separate `goOnline()` call is needed.
+`src/store.ts` owns live instances, wrapped for activity logging. `onchain`
+entries have a separate config and type from legacy `utexo`/`rln` entries.
+Each new profile gets a unique stable `dataDir`. `src/lib/session.ts` saves
+configuration to localStorage and active selection to sessionStorage/URL.
+Reload reopens the same profile. Do not reinterpret legacy state or discard
+sessions that failed to restore. Remove the saved entry explicitly when a
+profile is removed, and close its live instance.
 
-**Pages** (one route each in `App.tsx`):
-- `KeysPage` — `generateKeys`, `restoreKeys`, `deriveKeysFromMnemonic`, `bip39`
-- `UtexoWalletPage` — **primary**: create + full `UTEXOWallet` surface (RGB on-chain + Lightning), backed by RLN
-- `UtexoBackupPage` (`/backup`) — file backup (`createBackup`/`getLastBackupBytes`/`restoreFromBackupBytes`) + VSS
+On-chain file/VSS restore must run after init and before an online call. Blank
+VSS URL explicitly disables cloud backup. Backup passwords and bytes must not
+appear in activity logs. This sandbox stores mnemonics in localStorage.
 
-`BitcoinPage`, `RgbAssetsPage`, `RlnWalletPage`, and `RlnFlowGuidePage` were removed — they duplicated `UtexoWalletPage`'s coverage of BTC send, RGB issue/send/receive, and Lightning at the lower `RlnWalletManager`/`IRlnNodeBinding` layer. `UTEXOWallet` does not re-expose `sendBeginBatch`/`sendBatch`/`sendRgbFromGroups` (batch/group RGB send) — use `RlnWalletManager` directly for that if needed.
+## Bundling
 
-**Reusable components** worth knowing:
-- `StepFlow.tsx` — 3-step Begin → Sign → Broadcast UI; steps unlock sequentially; has an "Auto" button that runs all 3 at once
-- `OutputBox.tsx` — `<pre>` display with Copy button
-- `Field.tsx`, `Section.tsx`, `Btn.tsx` — form/layout primitives
+Resolve installed tarball packages; do not add sibling source aliases that
+make TypeScript, Vite and clean installs use different SDK versions. Keep
+`@utexo/rgb-sdk-web`, `@utexo/rgb-lib-wasm`, `@utexo/rgb-sdk-web-legacy` and
+`@utexo/rln-wasm` out of Vite dependency optimization. Legacy dependencies
+still need node polyfills, WASM and top-level-await plugins, in that order
+before React. Keep the RGB_L1 stand proxies separate from legacy LSP proxies.
 
-**Session persistence** (`src/lib/session.ts`): saves wallet entries (incl. `WalletConfig` with `password`) to `localStorage['rgb_wallet_sessions']`; active id in `sessionStorage['rgb_active_wallet_id']`.
+## UI
 
-## Critical Vite Config Rules
-
-`vite.config.ts` plugin order is **mandatory**:
-1. `nodePolyfills({ globals: { Buffer: true, process: true } })` — must be **first** (bitcoinjs-lib crashes without Buffer)
-2. `wasm()`
-3. `topLevelAwait()`
-4. `react()`
-
-`optimizeDeps.exclude` must list `@utexo/rgb-sdk-web` and sibling packages — Vite's pre-bundler breaks async WASM init if they're included.
-
-`server.fs.allow` must include sibling monorepo paths (`../rgb-sdk-web`, `../rgb-sdk-core`, `../../utexo/rgb-lightning-node/bindings/wasm-sdk/pkg`) so Vite can serve their WASM files.
-
-## SDK Patterns
-
-All SDK calls are async. The standard BTC/asset send flow is always 3 steps:
-```typescript
-const unsigned = await wallet.sendBtcBegin({ address, amount, feeRate });
-const signed   = await wallet.signPsbt(unsigned);   // signs with embedded mnemonic
-const txid     = await wallet.sendBtcEnd(signed);
-```
-
-`UTEXOWallet` vs `WalletManager`: UTEXOWallet supports mainnet and has a `transportEndpoint`; WalletManager is signet/testnet/regtest only. Both share the same method surface (`goOnline`, `getAddress`, `listAssets`, etc.).
-
-Backup bytes are returned as `Uint8Array`. Use `downloadBytes()` from `src/lib/utils.ts` to trigger a browser download.
-
-## Supported Networks
-
-`signet` (default), `testnet`, `regtest`, `mainnet` (UTEXOWallet only). Default indexer URLs and transport endpoints are exported from `@utexo/rgb-sdk-web`.
+Reuse `Section`, `Field`, `Btn`, `OutputBox` and existing colors. The on-chain
+page uses typed facade calls and engine backup extensions. Legacy pages keep
+their existing workflows. Browser tests use real WASM and IndexedDB without
+requiring external services; funded network flows need a separate live stand.

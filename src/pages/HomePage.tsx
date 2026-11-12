@@ -4,13 +4,18 @@ import { useStore } from '../store';
 
 const cards = [
   {
+    to: '/onchain',
+    title: 'On-chain Wallet',
+    desc: 'Create an RGB wallet, send Bitcoin and RGB assets, and back up wallet state with UTEXOWallet + RgbLibWeb',
+  },
+  {
     to: '/keys',
     title: 'Keys',
     desc: 'Generate keys, restore from mnemonic, derive extended keys, validate with bip39',
   },
   {
     to: '/utexo-wallet',
-    title: 'UTXO Wallet',
+    title: 'Lightning Wallet (legacy)',
     desc: 'Create an RLN-backed UTEXOWallet — RGB on-chain + Lightning, the full IUTEXOProtocol surface',
   },
   {
@@ -35,7 +40,7 @@ export function HomePage() {
     <div>
       <h1 className="text-[#58a6ff] text-3xl font-bold mb-2">RGB SDK Web Demo</h1>
       <p className="text-[#8b949e] mb-8">
-        Interactive demo of all <code className="text-[#c9d1d9]">@utexo/rgb-sdk-web</code> functions.
+        Explore <code className="text-[#c9d1d9]">@utexo/rgb-sdk</code> with the new browser engine. Lightning demos use the legacy SDK.
       </p>
 
       {/* Status */}

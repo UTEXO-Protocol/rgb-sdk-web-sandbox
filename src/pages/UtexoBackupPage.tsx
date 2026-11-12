@@ -4,7 +4,7 @@ import {
   deriveVssSigningKeyFromMnemonic,
   type VssBackupConfig,
   type UTEXOWallet,
-} from '@utexo/rgb-sdk-web';
+} from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../store';
 import { Section } from '../components/Section';
 import { Field, inputCls } from '../components/Field';

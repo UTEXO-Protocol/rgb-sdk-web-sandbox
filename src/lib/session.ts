@@ -1,26 +1,30 @@
-import { UTEXOWallet, RlnWalletManager, initRlnWasm } from '@utexo/rgb-sdk-web';
-import type { BitcoinNetwork } from '@utexo/rgb-sdk-core';
+import { UTEXOWallet, RlnWalletManager, initRlnWasm } from '@utexo/rgb-sdk-web-legacy';
+import type { BitcoinNetwork } from '@utexo/rgb-sdk-core-legacy';
 import { proxyIndexerUrl, DEMO_VSS_URL, resolveVssUrl } from './utils';
+import { openOnchainWallet, type OnchainConfig } from './onchain';
 import type { WalletInstance, WalletConfig } from '../store';
 
 const SESSION_KEY = 'rgb_wallet_sessions';  // localStorage — shared across tabs
 const ACTIVE_KEY = 'rgb_active_wallet_id';  // sessionStorage — per-tab
 
-interface SessionEntry {
-  id: string;
-  label: string;
-  type: 'utexo' | 'rln';
-  config: WalletConfig;
-}
+type SessionEntry = { id: string; label: string } & (
+  | { type: 'utexo' | 'rln'; config: WalletConfig }
+  | { type: 'onchain'; config: OnchainConfig }
+);
 
 export function saveSessions(wallets: WalletInstance[], activeWalletId: string | null): void {
-  const entries: SessionEntry[] = wallets.map((w) => ({
+  const entries = wallets.map((w) => ({
     id: w.id,
     label: w.label,
     type: w.type,
     config: w.config,
   }));
-  localStorage.setItem(SESSION_KEY, JSON.stringify(entries));
+  // Keep sessions that could not be opened (e.g. a legacy runtime is unavailable).
+  // Only an explicit removeSessionEntry removes their recovery configuration.
+  const saved: SessionEntry[] = JSON.parse(localStorage.getItem(SESSION_KEY) || '[]');
+  const merged = new Map(saved.map((entry) => [entry.id, entry]));
+  for (const entry of entries) merged.set(entry.id, entry as SessionEntry);
+  localStorage.setItem(SESSION_KEY, JSON.stringify([...merged.values()]));
   if (activeWalletId) {
     sessionStorage.setItem(ACTIVE_KEY, activeWalletId);
   } else {
@@ -94,6 +98,10 @@ export async function autoRestore(): Promise<RestoreResult> {
 }
 
 async function restoreEntry(entry: SessionEntry): Promise<WalletInstance | null> {
+  if (entry.type === 'onchain') {
+    const instance = await openOnchainWallet(entry.config);
+    return { ...entry, instance, online: false };
+  }
   const { type, config } = entry;
 
   if (type === 'utexo') {

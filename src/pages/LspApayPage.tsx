@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getDefaultLspBaseUrl } from '@utexo/rgb-sdk-web';
-import type { UTEXOWallet, UtexoLsp, LspPeer } from '@utexo/rgb-sdk-web';
+import { getDefaultLspBaseUrl } from '@utexo/rgb-sdk-web-legacy';
+import type { UTEXOWallet, UtexoLsp, LspPeer } from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../store';
 import { Section } from '../components/Section';
 import { Field, inputCls } from '../components/Field';

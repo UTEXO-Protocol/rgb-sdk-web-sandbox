@@ -10,7 +10,7 @@
 // existing P2P session (native parse_peer_info accepts pubkey-only for
 // already-connected peers). Single window — no BroadcastChannel needed.
 import { useCallback, useRef, useState } from 'react';
-import { UTEXOWallet, generateKeys } from '@utexo/rgb-sdk-web';
+import { UTEXOWallet, generateKeys } from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../../store';
 import { DEMO_VSS_URL, mineBlocks } from '../../lib/utils';
 import {

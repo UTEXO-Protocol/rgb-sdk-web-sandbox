@@ -1,0 +1,29 @@
+[
+  {
+    "repository": "rgb-sdk-core",
+    "commit": "7d1e2b7345a0c58e9d3ca56ed81d3465dc706392",
+    "workingTreeChanges": [],
+    "name": "@utexo/rgb-sdk-core",
+    "version": "0.1.0",
+    "file": "utexo-rgb-sdk-core-0.1.0.tgz",
+    "sha256": "b53484d17b09855a9d980784fffcda2397f2d09251d1dd56eabd2087ed3d1da9"
+  },
+  {
+    "repository": "rgb-sdk",
+    "commit": "d25f7d3777dc17d11661f0aaeca5e2096078124d",
+    "workingTreeChanges": [],
+    "name": "@utexo/rgb-sdk",
+    "version": "2.0.0-alpha.0",
+    "file": "utexo-rgb-sdk-2.0.0-alpha.0.tgz",
+    "sha256": "956235115bf88e0ac48ba07d6cc4cc25650a512d934020128aa5d1aaa80cd465"
+  },
+  {
+    "repository": "rgb-sdk-web",
+    "commit": "ce548a7ff33b2095878c5bb329c7c5f8cad54224",
+    "workingTreeChanges": [],
+    "name": "@utexo/rgb-sdk-web",
+    "version": "1.0.0",
+    "file": "utexo-rgb-sdk-web-1.0.0.tgz",
+    "sha256": "006738ed44c761d01d20991bba99087133d8ca516bc265ca0f752d70808d082e"
+  }
+]

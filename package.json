@@ -5,14 +5,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sdk:pack": "node scripts/pack-local-sdk.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@utexo/rgb-sdk-web": "1.0.0-beta.11",
+    "@utexo/rgb-sdk-web": "file:vendor/utexo-rgb-sdk-web-1.0.0.tgz",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.26.0",
-    "zustand": "^4.5.0"
+    "zustand": "^4.5.0",
+    "@utexo/rgb-sdk": "file:vendor/utexo-rgb-sdk-2.0.0-alpha.0.tgz",
+    "@utexo/rgb-sdk-core": "file:vendor/utexo-rgb-sdk-core-0.1.0.tgz",
+    "@utexo/rgb-sdk-web-legacy": "npm:@utexo/rgb-sdk-web@1.0.0-beta.11",
+    "@utexo/rgb-sdk-core-legacy": "npm:@utexo/rgb-sdk-core@1.0.0-beta.5"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
@@ -26,6 +33,7 @@
     "vite": "^6.0.0",
     "vite-plugin-node-polyfills": "^0.25.0",
     "vite-plugin-top-level-await": "^1.4.4",
-    "vite-plugin-wasm": "^3.3.0"
+    "vite-plugin-wasm": "^3.3.0",
+    "@playwright/test": "1.61.1"
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { generateKeys, UTEXOWallet, getDefaultLspBaseUrl, DEFAULT_VSS_SERVER_URL } from '@utexo/rgb-sdk-web';
-import type { UtexoLsp, LspPeer } from '@utexo/rgb-sdk-web';
+import { generateKeys, UTEXOWallet, getDefaultLspBaseUrl, DEFAULT_VSS_SERVER_URL } from '@utexo/rgb-sdk-web-legacy';
+import type { UtexoLsp, LspPeer } from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../store';
 import type { WalletInstance, WalletConfig } from '../store';
 import { Section } from '../components/Section';
@@ -332,9 +332,15 @@ export function UtexoWalletPage() {
     }
   }
 
-  function handleRemoveWallet() {
-    if (!activeWallet) return;
+  async function handleRemoveWallet() {
+    if (!activeWallet || activeWallet.type !== 'utexo') return;
     if (!window.confirm('Remove wallet "' + activeWallet.label + '"?')) return;
+    try {
+      await activeWallet.instance.dispose();
+    } catch (error) {
+      addLog('Could not close wallet: ' + error, 'err');
+      return;
+    }
     removeWallet(activeWallet.id);
     const remaining = wallets.filter((w) => w.id !== activeWallet.id);
     saveSessions(remaining, remaining[remaining.length - 1]?.id ?? null);

@@ -14,7 +14,7 @@
 //   gateway /dev/regular-rln proxy) → awaitReceiveSettlement.
 // Merchant never calls claimHodlInvoice — the LSP outbox delivers.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { UTEXOWallet, generateKeys, type UtexoLsp } from '@utexo/rgb-sdk-web';
+import { UTEXOWallet, generateKeys, type UtexoLsp } from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../../store';
 import { DEMO_VSS_URL } from '../../lib/utils';
 import {

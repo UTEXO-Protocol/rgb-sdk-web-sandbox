@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { initRlnWasm } from '@utexo/rgb-sdk-web';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
 import { autoRestore, getSavedActiveWalletId, setUrlWallet } from './lib/session';
+import { OnchainWalletPage } from './pages/OnchainWalletPage';
 import { HomePage } from './pages/HomePage';
 import { KeysPage } from './pages/KeysPage';
 import { UtexoBackupPage } from './pages/UtexoBackupPage';
@@ -20,10 +20,8 @@ function App() {
     if (didInit.current) return;
     didInit.current = true;
     setSdkStatus('loading');
-    initRlnWasm()
+    Promise.resolve()
       .then(async () => {
-        setSdkStatus('ready');
-        addLog('SDK initialized', 'ok');
         const { wallets: restored, errors } = await autoRestore();
         if (restored.length > 0) {
           // URL param > sessionStorage > last wallet
@@ -49,6 +47,8 @@ function App() {
             'err',
           );
         }
+        setSdkStatus('ready');
+        addLog('SDK ready', 'ok');
       })
       .catch((e) => {
         setSdkStatus('error', String(e));
@@ -61,6 +61,7 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/onchain" element={<OnchainWalletPage />} />
           <Route path="/keys" element={<KeysPage />} />
           <Route path="/backup" element={<UtexoBackupPage />} />
           <Route path="/utexo-wallet" element={<UtexoWalletPage />} />

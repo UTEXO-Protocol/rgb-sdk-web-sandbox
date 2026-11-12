@@ -8,8 +8,9 @@ import { saveSessions, setUrlWallet } from '../lib/session';
 
 const navLinks = [
   { to: '/', label: 'Home' },
+  { to: '/onchain', label: 'On-chain Wallet' },
   { to: '/keys', label: 'Keys' },
-  { to: '/utexo-wallet', label: 'UTXO Wallet' },
+  { to: '/utexo-wallet', label: 'Lightning Wallet' },
   { to: '/lsp-apay', label: 'LSP & APay' },
   { to: '/backup', label: 'Backup' },
 ];
@@ -100,7 +101,7 @@ export function Layout({ children }: LayoutProps) {
   const activeNetwork = (() => {
     try { return activeWallet?.instance.getNetwork() ?? null; } catch { return null; }
   })();
-  const isRegtest = activeNetwork === 'regtest';
+  const isRegtest = activeNetwork === 'regtest' && activeWallet?.type !== 'onchain';
 
   async function handleMine() {
     const n = parseInt(mineCount) || 1;
@@ -116,12 +117,20 @@ export function Layout({ children }: LayoutProps) {
     }
   }
 
-  function handleRemoveActive() {
+  async function handleRemoveActive() {
     if (!activeWallet) return;
     if (!window.confirm('Remove wallet "' + activeWallet.label + '"?')) return;
+    try {
+      if (activeWallet.type === 'onchain') await activeWallet.instance.destroy();
+      else await activeWallet.instance.dispose();
+    } catch (error) {
+      addLog('Could not close wallet: ' + error, 'err');
+      return;
+    }
     removeWallet(activeWallet.id);
     const remaining = wallets.filter((w) => w.id !== activeWallet.id);
     saveSessions(remaining, remaining[remaining.length - 1]?.id ?? null);
+    setUrlWallet(remaining[remaining.length - 1]?.id ?? null);
     addLog('Wallet "' + activeWallet.label + '" removed', 'warn');
   }
 
@@ -162,6 +171,7 @@ export function Layout({ children }: LayoutProps) {
           {wallets.length > 0 && (
             <div className="flex items-center gap-1">
               <select
+                aria-label="Active wallet"
                 value={activeWalletId ?? ''}
                 onChange={(e) => {
                   const id = e.target.value || null;
@@ -178,7 +188,7 @@ export function Layout({ children }: LayoutProps) {
                 ))}
               </select>
               <span className="text-xs text-[#484f58]">
-                {activeWallet?.type === 'utexo' ? 'UTXO' : activeWallet?.type === 'rln' ? 'RLN' : ''}
+                {activeWallet?.type === 'utexo' ? 'UTXO' : activeWallet?.type === 'rln' ? 'RLN' : 'RGB_L1'}
               </span>
               <button
                 onClick={handleRemoveActive}

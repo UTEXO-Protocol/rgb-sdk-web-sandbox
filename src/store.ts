@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { UTEXOWallet, RlnWalletManager } from '@utexo/rgb-sdk-web';
+import type { UTEXOWallet, RlnWalletManager } from '@utexo/rgb-sdk-web-legacy';
+import type { OnchainConfig, OnchainWallet } from './lib/onchain';
+import { removeSessionEntry } from './lib/session';
 import { wrapWallet } from './lib/wrapWallet';
 
 type LogLevel = 'ok' | 'err' | 'warn' | 'info';
@@ -41,13 +43,19 @@ export interface WalletConfig {
   vssUrl?: string | null;
 }
 
-export interface WalletInstance {
+interface WalletEntry {
   id: string;
   label: string;
-  type: 'utexo' | 'rln';
-  config: WalletConfig;
-  instance: UTEXOWallet | RlnWalletManager;
   online: boolean;
+}
+
+export type WalletInstance = WalletEntry & (
+  | { type: 'utexo' | 'rln'; config: WalletConfig; instance: UTEXOWallet | RlnWalletManager }
+  | { type: 'onchain'; config: OnchainConfig & Partial<WalletConfig>; instance: OnchainWallet }
+);
+
+function loggedWallet<T extends WalletInstance>(wallet: T, log: (entry: SdkLogEntry) => void): T {
+  return { ...wallet, instance: wrapWallet(wallet.instance, log) };
 }
 
 interface Store {
@@ -84,17 +92,18 @@ export const useStore = create<Store>((set, get) => ({
     set({ sdkStatus, sdkError: err ?? null }),
 
   addWallet: (w) => {
-    const wrapped = { ...w, instance: wrapWallet(w.instance, get().addSdkLog) };
+    const wrapped = loggedWallet(w, get().addSdkLog);
     set((s) => ({ wallets: [...s.wallets, wrapped], activeWalletId: w.id }));
   },
 
   setWallets: (wallets, activeWalletId) => {
     const addSdkLog = get().addSdkLog;
-    const wrapped = wallets.map((w) => ({ ...w, instance: wrapWallet(w.instance, addSdkLog) }));
+    const wrapped = wallets.map((w) => (loggedWallet(w, addSdkLog)));
     set({ wallets: wrapped, activeWalletId });
   },
 
-  removeWallet: (id) =>
+  removeWallet: (id) => {
+    removeSessionEntry(id);
     set((s) => {
       const wallets = s.wallets.filter((w) => w.id !== id);
       const activeWalletId =
@@ -102,7 +111,8 @@ export const useStore = create<Store>((set, get) => ({
           ? (wallets[wallets.length - 1]?.id ?? null)
           : s.activeWalletId;
       return { wallets, activeWalletId };
-    }),
+    });
+  },
 
   setActiveWalletId: (activeWalletId) => set({ activeWalletId }),
 

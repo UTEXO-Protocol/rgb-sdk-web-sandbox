@@ -27,3 +27,7 @@ npm-debug.log*
 
 # Local scripts
 scripts/start-lsp-web.sh
+
+# Browser test artifacts
+test-results/
+playwright-report/

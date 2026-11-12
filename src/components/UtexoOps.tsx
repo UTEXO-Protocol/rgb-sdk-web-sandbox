@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { UTEXOWallet } from '@utexo/rgb-sdk-web';
+import type { UTEXOWallet } from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../store';
 import { Section } from './Section';
 import { Field, inputCls, selectCls } from './Field';

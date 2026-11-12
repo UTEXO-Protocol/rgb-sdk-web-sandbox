@@ -1,4 +1,4 @@
-import { DEFAULT_TRANSPORT_ENDPOINTS, DEFAULT_INDEXER_URLS, getRlnUrls } from '@utexo/rgb-sdk-web';
+import { DEFAULT_TRANSPORT_ENDPOINTS, DEFAULT_INDEXER_URLS, getRlnUrls } from '@utexo/rgb-sdk-web-legacy';
 
 export const json = (obj: unknown): string =>
   JSON.stringify(obj, (_, v) => {

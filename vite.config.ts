@@ -4,7 +4,6 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
@@ -12,41 +11,9 @@ const require = createRequire(import.meta.url);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * Real path of the @utexo/rln-wasm actually in use, for server.fs.allow.
- *
- * It is not a direct dependency of the demo — it arrives through rgb-sdk-web,
- * so resolve it there. When rgb-sdk-web points at a local wasm-pack build via
- * `file:`, the symlink lands outside every path below and vite refuses to serve
- * the .wasm ("outside of Vite serving allow list").
- */
-const rlnWasmRoot: string[] = (() => {
-  for (const base of ['../rgb-sdk-web', '.']) {
-    const p = path.resolve(__dirname, base, 'node_modules/@utexo/rln-wasm');
-    if (fs.existsSync(p)) return [fs.realpathSync(p)];
-  }
-  return [];
-})();
-
-const localRgbSdkCorePath = path.resolve(__dirname, '../rgb-sdk-core/src/index.ts');
-const localRgbSdkWebPath = path.resolve(__dirname, '../rgb-sdk-web/src/index.ts');
-const localAliases = {
-  ...(fs.existsSync(localRgbSdkCorePath)
-    ? { '@utexo/rgb-sdk-core': localRgbSdkCorePath }
-    : {}),
-  ...(fs.existsSync(localRgbSdkWebPath)
-    ? { '@utexo/rgb-sdk-web': localRgbSdkWebPath }
-    : {}),
-};
-
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, 'VITE_');
   return {
-  resolve: {
-    // Use local sibling core package only when it exists (local monorepo dev).
-    // In CI/Docker this path does not exist, so Vite should resolve from npm package.
-    alias: localAliases,
-  },
   build: {
     rollupOptions: {
       plugins: [
@@ -70,6 +37,17 @@ export default defineConfig(({ mode }) => {
   server: {
     port: 5173,
     proxy: {
+      '/rgb-l1-esplora': {
+        target: env.VITE_RGB_L1_INDEXER_TARGET || 'http://127.0.0.1:8094',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/rgb-l1-esplora/, ''),
+      },
+      '/rgb-l1-proxy': {
+        target: env.VITE_RGB_L1_PROXY_TARGET || 'http://127.0.0.1:3002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/rgb-l1-proxy/, ''),
+      },
+
       // bitcoind RPC (regtest mine/fund) — the compose.wasm.yaml esplora
       // container's bitcoind, host-mapped on 18444 (see start-lsp-web.sh).
       '/bitcoind': {
@@ -127,26 +105,10 @@ export default defineConfig(({ mode }) => {
         rewrite: (path) => path.replace(/^\/faucet-signet/, ''),
       },
     },
-    fs: {
-      // Allow serving WASM files from sibling local packages
-      allow: [
-        path.resolve(__dirname),
-        path.resolve(__dirname, '../rgb-sdk-web'),
-        path.resolve(__dirname, '../rgb-sdk-core'),
-        path.resolve(__dirname, '../../utexo/rgb-lightning-node/bindings/wasm-sdk/pkg'),
-        // Wherever @utexo/rln-wasm actually resolves to. Resolved through the
-        // symlink rather than hardcoded, so a `file:` dep pointing at a local
-        // wasm-pack build serves its .wasm without another entry here — the
-        // paths above only cover the two locations that happened to be used
-        // first, and a build anywhere else fails with "outside of Vite serving
-        // allow list" long after the config was last touched.
-        ...rlnWasmRoot,
-      ],
-    },
   },
   optimizeDeps: {
-    // Don't pre-bundle — these contain WASM / local file: symlinks
-    exclude: ['@utexo/rgb-sdk-web', '@utexo/rln-wasm'],
+    // Preserve WASM import.meta.url in both new and legacy engines.
+    exclude: ['@utexo/rgb-sdk-web', '@utexo/rgb-lib-wasm', '@utexo/rgb-sdk-web-legacy', '@utexo/rln-wasm'],
     // Force pre-bundle CJS deps pulled in by excluded packages so named exports work
     include: ['bitcoinjs-lib'],
   },

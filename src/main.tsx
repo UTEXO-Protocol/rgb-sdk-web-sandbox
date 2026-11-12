@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { configureLogging, LogLevel } from '@utexo/rgb-sdk-core';
+import { configureLogging, LogLevel } from '@utexo/rgb-sdk-core-legacy';
 import App from './App';
 import './index.css';
 

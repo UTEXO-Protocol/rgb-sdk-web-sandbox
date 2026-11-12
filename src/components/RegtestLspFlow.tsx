@@ -3,7 +3,7 @@ import {
   UTEXOWallet,
   generateKeys,
   type UtexoLsp,
-} from '@utexo/rgb-sdk-web';
+} from '@utexo/rgb-sdk-web-legacy';
 import { useStore } from '../store';
 import { DEMO_VSS_URL } from '../lib/utils';
 import { Section } from './Section';
