@@ -1,11 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
 import { autoRestore, getSavedActiveWalletId, setUrlWallet } from './lib/session';
-import { OnchainWalletPage } from './pages/OnchainWalletPage';
+import { UtexoWalletPage } from './pages/UtexoWalletPage';
 import { HomePage } from './pages/HomePage';
 import { KeysPage } from './pages/KeysPage';
+
+function WalletRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: '/utexo-wallet', search, hash }} replace />;
+}
 
 function App() {
   const setSdkStatus = useStore((s) => s.setSdkStatus);
@@ -51,7 +56,8 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/onchain" element={<OnchainWalletPage />} />
+          <Route path="/utexo-wallet" element={<UtexoWalletPage />} />
+          <Route path="/onchain" element={<WalletRedirect />} />
           <Route path="/keys" element={<KeysPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -47,13 +47,13 @@ async function action(page, label, method) {
 }
 
 async function open(page, label) {
-  await page.goto('/onchain');
+  await page.goto('/utexo-wallet');
   await page.getByLabel('Network', { exact: true }).selectOption('regtest');
   await page.getByLabel('Wallet label', { exact: true }).fill(label);
   // The default UI URLs exercise the app's development/preview proxies.
   if (process.env.RGB_E2E_INDEXER) await page.getByLabel('Esplora URL', { exact: true }).fill(indexer);
   if (process.env.RGB_E2E_PROXY_HTTP) await page.getByLabel('RGB proxy endpoint', { exact: true }).fill(proxy);
-  await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Create UTEXOWallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: `Active: ${label}`, exact: true })).toBeVisible();
   return action(page, 'Get address', 'getAddress');
 }
@@ -105,6 +105,7 @@ test('regtest: funded BTC, UTXOs, NIA witness/blinded transfers and IFA inflatio
 
     for (const page of [sender, receiver]) {
       await page.getByLabel('Number of allocation UTXOs', { exact: true }).fill('8');
+      await page.getByLabel('UTXO size (sats; optional)', { exact: true }).fill('1000');
       expect(await action(page, 'Create UTXOs', 'createUtxos')).toBe(8);
     }
     await mine();
@@ -114,12 +115,19 @@ test('regtest: funded BTC, UTXOs, NIA witness/blinded transfers and IFA inflatio
     }
     const nia = await action(sender, 'Issue NIA', 'issueAssetNia');
     expect(nia.balance.settled).toBe(1000);
+    await sender.getByLabel('Asset ID to validate', { exact: true }).fill(nia.assetId);
+    await sender.getByLabel('Required asset amount', { exact: true }).fill('100');
+    expect(await action(sender, 'Check spendable balance', 'validateBalance')).toMatchObject({ valid: true, spendable: 1000, required: 100 });
+    await sender.getByLabel('Required asset amount', { exact: true }).fill('1001');
+    await sender.getByRole('button', { name: 'Check spendable balance', exact: true }).click();
+    await expect(sender.getByRole('status')).toContainText('Insufficient spendable balance: 1000 < 1001');
     await sender.getByLabel('Asset ID (blank lists all transfers)', { exact: true }).fill(nia.assetId);
     await sender.getByLabel('Asset ID for balance', { exact: true }).fill(nia.assetId);
     await sender.getByLabel('Send asset ID (optional)', { exact: true }).fill(nia.assetId);
     await receiver.getByLabel('Asset ID for balance', { exact: true }).fill(nia.assetId);
     let transferred = 0;
     for (const witness of [true, false]) {
+      await receiver.getByLabel('Invoice duration (seconds; optional)', { exact: true }).fill('3600');
       await receiver.getByRole('checkbox', { name: 'Witness invoice', exact: true }).setChecked(witness);
       if (!witness) {
         // A named asset requires an explicit receive amount; no unusable invoice.

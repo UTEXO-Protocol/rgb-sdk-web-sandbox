@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { generateKeys, type Network } from '@utexo/rgb-sdk-core';
+import { accountXpubsFromMnemonic, generateKeys, type Network } from '@utexo/rgb-sdk-core';
 import { useStore } from '../store';
 import { useActiveWallet } from '../hooks/useActiveWallet';
 import { openOnchainWallet, onchainDefaults, type OnchainWallet } from '../lib/onchain';
@@ -19,7 +19,7 @@ function Input({ label, value, onChange, type = 'text' }: {
   return <Field label={label}><input aria-label={label} type={type} className={inputCls} value={value} onChange={(e) => onChange(e.target.value)} /></Field>;
 }
 
-export function OnchainWalletPage() {
+export function UtexoWalletPage() {
   const active = useActiveWallet();
   const sdkStatus = useStore((s) => s.sdkStatus);
   const [network, setNetwork] = useState<Network>('testnet');
@@ -30,6 +30,18 @@ export function OnchainWalletPage() {
   const [vssUrl, setVssUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [output, setOutput] = useState('');
+
+  async function handleGenMnemonic() {
+    setBusy(true);
+    try {
+      setMnemonic((await generateKeys(network)).mnemonic);
+      setOutput('Mnemonic generated. Save it before creating the wallet.');
+    } catch (error) {
+      setOutput('Error: ' + error);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function createWallet() {
     setBusy(true);
@@ -69,7 +81,7 @@ export function OnchainWalletPage() {
       <h2 className="text-sm font-bold uppercase tracking-widest">Onchain</h2>
       <div className="flex-1 h-px bg-[#30363d]" />
     </div>
-    <Section id="sec-create" title="1. Create / restore wallet" hint="Each profile has its own wallet storage. Keep the mnemonic and a wallet backup to recover RGB assets. Demo sessions store the mnemonic in this browser.">
+    <Section id="sec-create" title="1. Create UTEXOWallet" hint="Each profile has its own wallet storage. Keep the mnemonic and a wallet backup to recover RGB assets. Demo sessions store the mnemonic in this browser.">
       <div className="grid md:grid-cols-2 gap-x-4">
         <Input label="Wallet label" value={label} onChange={setLabel} />
         <Field label="Network"><select aria-label="Network" value={network} className={selectCls} onChange={(e) => {
@@ -87,10 +99,13 @@ export function OnchainWalletPage() {
       </div>
       <p className="text-sm text-[#8b949e] mb-4">Blank endpoints use network defaults. Signet and mainnet require an HTTP(S) Esplora URL. Regtest uses the local RGB_L1 stand.</p>
       <Input label="VSS URL (blank disables cloud backup)" value={vssUrl} onChange={setVssUrl} />
-      <Btn onClick={createWallet} disabled={busy || sdkStatus !== 'ready'}>{busy ? 'Opening…' : 'Open on-chain wallet'}</Btn>
+      <div className="flex gap-2 flex-wrap">
+        <Btn variant="secondary" onClick={handleGenMnemonic} disabled={busy || sdkStatus !== 'ready'}>Generate Mnemonic</Btn>
+        <Btn onClick={createWallet} disabled={busy || sdkStatus !== 'ready'}>{busy ? 'Opening…' : 'Create UTEXOWallet'}</Btn>
+      </div>
       <OutputBox value={output} />
     </Section>
-    <WalletOperations key={active?.id ?? 'no-wallet'} wallet={active?.instance ?? null} id={active?.id ?? null} label={active?.label} network={active?.config.network} />
+    <WalletOperations key={active?.id ?? 'no-wallet'} wallet={active?.instance ?? null} id={active?.id ?? null} label={active?.label} network={active?.config.network} mnemonic={active?.config.mnemonic} />
     </div>
   </div>;
 }
@@ -109,8 +124,8 @@ function AssetFields({ value, onChange, prefix = '' }: {
   </div>;
 }
 
-function WalletOperations({ wallet, id, label, network }: {
-  wallet: OnchainWallet | null; id: string | null; label?: string; network?: Network;
+function WalletOperations({ wallet, id, label, network, mnemonic }: {
+  wallet: OnchainWallet | null; id: string | null; label?: string; network?: Network; mnemonic?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [outputs, setOutputs] = useState<Partial<Record<WalletSectionId, string>>>({});
@@ -120,6 +135,7 @@ function WalletOperations({ wallet, id, label, network }: {
   const [feeRate, setFeeRate] = useState('2');
   const [fundAmount, setFundAmount] = useState('1');
   const [utxoNum, setUtxoNum] = useState('5');
+  const [utxoSize, setUtxoSize] = useState('');
   const [utxoFee, setUtxoFee] = useState('2');
   const [assetId, setAssetId] = useState('');
   const [nia, setNia] = useState(initialAsset);
@@ -129,10 +145,12 @@ function WalletOperations({ wallet, id, label, network }: {
   const [inflateFee, setInflateFee] = useState('2');
   const [receiveAssetId, setReceiveAssetId] = useState('');
   const [receiveAmount, setReceiveAmount] = useState('');
+  const [receiveDuration, setReceiveDuration] = useState('');
   const [witness, setWitness] = useState(true);
   const [sendAssetId, setSendAssetId] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [sendFee, setSendFee] = useState('2');
+  const [donation, setDonation] = useState(false);
   const [invoice, setInvoice] = useState('');
   const [decodeInvoice, setDecodeInvoice] = useState('');
   const [witnessSats, setWitnessSats] = useState('1000');
@@ -141,6 +159,9 @@ function WalletOperations({ wallet, id, label, network }: {
   const [file, setFile] = useState<File | null>(null);
   const [overwrite, setOverwrite] = useState(false);
   const [batchIdx, setBatchIdx] = useState('');
+  const [validateAssetId, setValidateAssetId] = useState('');
+  const [validateAmount, setValidateAmount] = useState('');
+  const [showMnemonic, setShowMnemonic] = useState(false);
 
   async function run(section: WalletSectionId, method: string, action: (wallet: OnchainWallet) => unknown | Promise<unknown>, online = false) {
     if (!wallet || !id || busy) return;
@@ -169,9 +190,13 @@ function WalletOperations({ wallet, id, label, network }: {
   const issueParams = (form: AssetForm) => ({ ...form, precision: Number(form.precision), amounts: parseAmounts(form.amounts) });
 
   return <>
-    {wallet ? <div className="bg-[#0d2818] border border-[#238636] rounded-lg p-4 mb-6 flex items-center justify-between gap-3 flex-wrap">
-      <h2 className="font-semibold text-[#3fb950]">Active: {label}</h2>
-      <span className="text-xs text-[#8b949e]">{network} · RGB_L1</span>
+    {wallet ? <div className="bg-[#0d2818] border border-[#238636] rounded-lg p-4 mb-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="font-semibold text-[#3fb950]">Active: {label}</h2>
+        <span className="text-xs text-[#8b949e]">{network} · RGB_L1</span>
+        <Btn variant="secondary" onClick={() => setShowMnemonic((show) => !show)}>{showMnemonic ? 'Hide mnemonic' : 'Show mnemonic'}</Btn>
+      </div>
+      {showMnemonic && <OutputBox label="Active wallet mnemonic" value={mnemonic ?? ''} />}
     </div> : <p className="text-sm text-[#d29922] mb-6">Create or select a wallet to enable the operations below.</p>}
     <fieldset disabled={busy || !wallet} className="min-w-0">
       <Section id="sec-online" title="2. Connect" hint="Connect to the indexer before online operations. Restore a backup first if needed; connecting closes the restore window until you reopen the wallet.">
@@ -223,9 +248,12 @@ function WalletOperations({ wallet, id, label, network }: {
       <Section id="sec-utxos" title="6. Create UTXOs" hint="Create colorable UTXOs for RGB allocations. Wait for confirmation before issuing assets or creating blinded invoices.">
         <div className="grid md:grid-cols-2 gap-x-4">
           <Input label="Number of allocation UTXOs" value={utxoNum} onChange={setUtxoNum} />
+          <Input label="UTXO size (sats; optional)" value={utxoSize} onChange={setUtxoSize} />
           <Input label="UTXO fee rate (sat/vB)" value={utxoFee} onChange={setUtxoFee} />
         </div>
-        <Btn onClick={() => run('utxos', 'createUtxos', (w) => w.createUtxos({ num: Number(utxoNum), feeRate: Number(utxoFee) }), true)}>Create UTXOs</Btn>
+        <Btn onClick={() => run('utxos', 'createUtxos', (w) => w.createUtxos({
+          num: Number(utxoNum), size: utxoSize.trim() ? Number(utxoSize) : undefined, feeRate: Number(utxoFee),
+        }), true)}>Create UTXOs</Btn>
         {result('utxos')}
       </Section>
       <Section id="sec-sync" title="7. Sync" hint="Sync updates Bitcoin and UTXO state. Refresh advances pending RGB transfers; run it on both wallets until a transfer is Settled.">
@@ -263,12 +291,14 @@ function WalletOperations({ wallet, id, label, network }: {
         <div className="grid md:grid-cols-2 gap-x-4">
           <Input label="Receive asset ID (optional)" value={receiveAssetId} onChange={setReceiveAssetId} />
           <Input label="Receive amount (smallest units)" value={receiveAmount} onChange={setReceiveAmount} />
+          <Input label="Invoice duration (seconds; optional)" value={receiveDuration} onChange={setReceiveDuration} />
         </div>
         <p className="text-sm text-[#8b949e] mb-4">For a specific asset, enter its amount. Leave both fields blank for an open invoice.</p>
         <label className="block text-sm mb-4"><input type="checkbox" checked={witness} onChange={(e) => setWitness(e.target.checked)} /> Witness invoice</label>
         <Btn disabled={Boolean(receiveAssetId.trim()) && !receiveAmount.trim()} onClick={() => run('receive', 'onchainReceive', (w) => w.onchainReceive({
           assetId: receiveAssetId.trim() || undefined,
           amount: receiveAmount.trim() ? Number(receiveAmount) : undefined,
+          durationSeconds: receiveDuration.trim() ? Number(receiveDuration) : undefined,
           witness, minConfirmations: 1,
         }), true)}>Create RGB invoice</Btn>
         {result('receive')}
@@ -281,8 +311,10 @@ function WalletOperations({ wallet, id, label, network }: {
           <Input label="RGB fee rate (sat/vB)" value={sendFee} onChange={setSendFee} />
           <Input label="Witness output (sats; blank for blinded invoice)" value={witnessSats} onChange={setWitnessSats} />
         </div>
+        <label className="block text-sm mb-4"><input type="checkbox" checked={donation} onChange={(e) => setDonation(e.target.checked)} /> Donation mode (skip recipient acknowledgement)</label>
         <Btn onClick={() => run('send-rgb', 'onchainSend', (w) => w.onchainSend({
           invoice: invoice.trim(), assetId: sendAssetId.trim() || undefined,
+          donation,
           amount: sendAmount.trim() ? Number(sendAmount) : undefined, feeRate: Number(sendFee), minConfirmations: 1,
           witnessData: witnessSats.trim() ? { amountSat: Number(witnessSats) } : undefined,
         }), true)}>Send RGB</Btn>
@@ -298,16 +330,37 @@ function WalletOperations({ wallet, id, label, network }: {
         <Btn variant="danger" disabled={!batchIdx.trim()} onClick={() => run('transfers', 'failTransfers', (w) => w.failTransfers({ batchTransferIdx: Number(batchIdx), noAssetOnly: false }), true)}>Fail transfer</Btn>
         {result('transfers')}
       </Section>
-      <Section id="sec-keys" title="14. Wallet Keys" hint="Inspect the active wallet's public identity and network. Use the Keys page in the top menu to generate or validate a mnemonic.">
-        <Btn onClick={() => run('keys', 'getWalletIdentity', (w) => w.getWalletIdentity())}>Wallet identity</Btn>
+      <Section id="sec-keys" title="14. Wallet Keys" hint="Inspect the active wallet's public identity, network and vanilla/colored account xpubs. Use the Keys page in the top menu to validate a mnemonic.">
+        <div className="flex gap-2 flex-wrap">
+          <Btn onClick={() => run('keys', 'getWalletIdentity', (w) => w.getWalletIdentity())}>Wallet identity</Btn>
+          <Btn variant="secondary" onClick={() => run('keys', 'accountXpubsFromMnemonic', async (w) => {
+            if (!mnemonic) throw new Error('The active wallet has no saved mnemonic');
+            const network = w.getNetwork();
+            return { network, ...await accountXpubsFromMnemonic(network, mnemonic) };
+          })}>Account xpubs</Btn>
+        </div>
         {result('keys')}
       </Section>
-      <Section id="sec-decode" title="15. Decode RGB Invoice" hint="Inspect an invoice's network, recipient and asset details before sending.">
-        <Field label="Invoice to decode"><textarea aria-label="Invoice to decode" className={textareaCls} value={decodeInvoice} onChange={(e) => setDecodeInvoice(e.target.value)} /></Field>
-        <Btn onClick={() => run('decode', 'decodeRGBInvoice', (w) => w.decodeRGBInvoice({ invoice: decodeInvoice.trim() }))}>Decode invoice</Btn>
-        {result('decode')}
+      <Section id="sec-validate" title="15. Validate Balance" hint="Check whether the wallet has enough spendable units of an asset before sending.">
+        <div className="grid md:grid-cols-2 gap-x-4">
+          <Input label="Asset ID to validate" value={validateAssetId} onChange={setValidateAssetId} />
+          <Input label="Required asset amount" value={validateAmount} onChange={setValidateAmount} />
+        </div>
+        <Btn disabled={!validateAssetId.trim() || !validateAmount.trim()} onClick={() => run('validate', 'validateBalance', async (w) => {
+          const amount = Number(validateAmount);
+          if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Enter a positive whole amount in the asset’s smallest units');
+          const balance = await w.getAssetBalance(validateAssetId.trim());
+          if (balance.spendable < amount) throw new Error(`Insufficient spendable balance: ${balance.spendable} < ${amount}`);
+          return { valid: true, spendable: balance.spendable, required: amount };
+        })}>Check spendable balance</Btn>
+        {result('validate')}
       </Section>
-      <Section id="sec-backup" title="16. Backup / Restore" hint="Restore after opening, before Connect or online operations. For a fresh profile, create another wallet with the same mnemonic. Existing state requires explicit overwrite.">
+      <Section id="sec-crypto" title="16. Decode RGB Invoice" hint="Inspect an invoice's network, recipient and asset details before sending.">
+        <Field label="Invoice to decode"><textarea aria-label="Invoice to decode" className={textareaCls} value={decodeInvoice} onChange={(e) => setDecodeInvoice(e.target.value)} /></Field>
+        <Btn onClick={() => run('crypto', 'decodeRGBInvoice', (w) => w.decodeRGBInvoice({ invoice: decodeInvoice.trim() }))}>Decode invoice</Btn>
+        {result('crypto')}
+      </Section>
+      <Section id="sec-backup" title="17. Backup / Restore" hint="Restore after opening, before Connect or online operations. For a fresh profile, create another wallet with the same mnemonic. Existing state requires explicit overwrite.">
         <Input label="Backup password" type="password" value={password} onChange={setPassword} />
         <Field label="Backup file"><input aria-label="Backup file" type="file" className="w-full min-w-0 text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
         <label className="block text-sm mb-4"><input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} /> Overwrite existing wallet state when restoring</label>

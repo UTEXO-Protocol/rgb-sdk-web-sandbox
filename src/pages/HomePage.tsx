@@ -4,8 +4,8 @@ import { useStore } from '../store';
 
 const cards = [
   {
-    to: '/onchain',
-    title: 'On-chain Wallet',
+    to: '/utexo-wallet',
+    title: 'UTXO Wallet',
     desc: 'Create an RGB wallet, send Bitcoin and RGB assets, and back up wallet state with UTEXOWallet + RgbLibWeb',
   },
   {

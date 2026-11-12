@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { selectCls } from './Field';
 
 export const walletSections = [
@@ -16,14 +17,21 @@ export const walletSections = [
   { id: 'send-rgb', label: '12 · Send RGB' },
   { id: 'transfers', label: '13 · Transfers' },
   { id: 'keys', label: '14 · Wallet keys' },
-  { id: 'decode', label: '15 · Decode invoice' },
-  { id: 'backup', label: '16 · Backup / restore' },
+  { id: 'validate', label: '15 · Validate balance' },
+  { id: 'crypto', label: '16 · Decode invoice' },
+  { id: 'backup', label: '17 · Backup / restore' },
 ] as const;
 
 export type WalletSectionId = typeof walletSections[number]['id'];
 
 export function WalletSections() {
   const [activeSection, setActiveSection] = useState<WalletSectionId>('create');
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    const section = walletSections.find((item) => hash === `#sec-${item.id}`);
+    if (section) document.getElementById(`sec-${section.id}`)?.scrollIntoView({ block: 'start' });
+  }, [hash]);
 
   useEffect(() => {
     let frame = 0;

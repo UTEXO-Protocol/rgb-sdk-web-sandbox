@@ -13,12 +13,13 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:5173/onchain. No sibling checkout or npm release is
+Open http://localhost:5173/utexo-wallet. No sibling checkout or npm release is
 needed: `vendor/` contains built snapshots of `rgb-sdk-core`, `rgb-sdk`, and
 `rgb-sdk-web`. `vendor/sdk-snapshots.json` records their source commits and
 SHA-256 checksums; the lockfile pins their npm integrity hashes.
 
-The on-chain screen provides wallet creation, balances, UTXOs, NIA/IFA issuance,
+`UtexoWalletPage` retains the original `/utexo-wallet` route and provides wallet
+creation, balances, UTXOs, NIA/IFA issuance,
 BTC/RGB sends, witness/blinded invoices, transfers, encrypted file backups and
 VSS. The sticky left menu links to numbered operation sections, with a section
 picker on small screens. Each section keeps its own result; receive, send and
@@ -104,8 +105,10 @@ variables.
 
 This app uses only the new on-chain SDK. Lightning, LSP/APay and the former
 RLN backup screens, runtime dependencies and stand scripts have been removed.
-Only Home, On-chain Wallet and Keys appear in navigation; old routes return
-to Home. File and VSS backup/restore are on the on-chain wallet screen.
+Home, UTXO Wallet and Keys appear in navigation. The original wallet page
+and route are retained; `/onchain` redirects to `/utexo-wallet` while preserving
+the wallet selection and section anchor. Removed Lightning routes return Home.
+File and VSS backup/restore are on the on-chain wallet screen.
 
 Existing on-chain profiles reopen normally. Saved records of other wallet
 types are preserved unchanged in localStorage but never opened or converted

@@ -9,9 +9,9 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
     if (response.url().includes('.wasm')) wasm.push({ url: response.url(), status: response.status() });
   });
   await page.route('**/*', (route) => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
-  await page.goto('/onchain');
+  await page.goto('/utexo-wallet');
   await page.getByLabel('Wallet label', { exact: true }).fill('Alice');
-  await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Create UTEXOWallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Active: Alice', exact: true })).toBeVisible();
   // An older session that cannot currently reopen must survive saves/removals.
   await page.evaluate(() => {
@@ -33,6 +33,11 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
   // Results stay beside their own operations when another section is used.
   await expect(page.locator('#sec-keys pre')).toHaveText(identity);
   await expect(page.locator('#sec-info pre')).toContainText('vanilla');
+  await page.getByRole('button', { name: 'Account xpubs', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('account_xpub_vanilla');
+  await expect(page.getByRole('status')).toContainText('account_xpub_colored');
+  await expect(page.getByRole('status')).not.toContainText(mnemonic);
+  await expect(page.getByRole('status')).not.toContainText('xpriv');
 
   await page.getByLabel('Backup password', { exact: true }).fill('browser-test-backup');
   const downloading = page.waitForEvent('download');
@@ -59,13 +64,21 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Active: Alice', exact: true })).toBeVisible();
+  const selectedId = new URL(page.url()).searchParams.get('wallet');
+  await page.goto(`/onchain?wallet=${selectedId}#sec-keys`);
+  await expect(page).toHaveURL((url) => url.pathname === '/utexo-wallet' && url.searchParams.get('wallet') === selectedId && url.hash === '#sec-keys');
+  await expect(page.getByRole('heading', { name: 'Active: Alice', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Show mnemonic', exact: true }).click();
+  await expect(page.locator('pre').filter({ hasText: mnemonic })).toBeVisible();
+  await page.getByRole('button', { name: 'Hide mnemonic', exact: true }).click();
+  await expect(page.locator('pre').filter({ hasText: mnemonic })).toHaveCount(0);
   await page.getByRole('button', { name: 'Wallet identity', exact: true }).click();
   await expect(page.getByRole('status').locator('pre')).toHaveText(identity);
 
   // Same mnemonic, a different dataDir: no storage collision with Alice.
   await page.getByLabel('Wallet label', { exact: true }).fill('Restored');
   await page.getByLabel('Mnemonic', { exact: true }).fill(mnemonic);
-  await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Create UTEXOWallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Active: Restored', exact: true })).toBeVisible();
   await page.getByLabel('Backup file', { exact: true }).setInputFiles(backup);
   await page.getByLabel('Backup password', { exact: true }).fill('browser-test-backup');
@@ -97,7 +110,7 @@ test('on-chain profiles reopen, keep wallet state, and restore encrypted backups
 });
 
 test('failed initialization is recoverable and removed routes return home', async ({ page }) => {
-  await page.goto('/onchain');
+  await page.goto('/utexo-wallet');
   const sections = page.getByRole('navigation', { name: 'Wallet sections' });
   await expect(sections).toBeVisible();
   await sections.getByRole('button', { name: '5 · Send BTC', exact: true }).click();
@@ -107,14 +120,16 @@ test('failed initialization is recoverable and removed routes return home', asyn
   await expect(sections.locator('[aria-current="location"]')).toHaveText('5 · Send BTC');
   await sections.getByRole('button', { name: '1 · Create wallet', exact: true }).click();
   await page.getByLabel('Mnemonic', { exact: true }).fill('invalid mnemonic');
-  await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Create UTEXOWallet', exact: true }).click();
   await expect(page.getByText(/Error:.*mnemonic/i).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open on-chain wallet', exact: true })).toBeEnabled();
-  await page.getByLabel('Mnemonic', { exact: true }).fill('');
+  await expect(page.getByRole('button', { name: 'Create UTEXOWallet', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Generate Mnemonic', exact: true }).click();
+  await expect(page.getByLabel('Mnemonic', { exact: true })).not.toHaveValue('invalid mnemonic');
+  await expect(page.getByLabel('Mnemonic', { exact: true })).not.toBeEmpty();
   await page.getByLabel('Wallet label', { exact: true }).fill('Recovered');
-  await page.getByRole('button', { name: 'Open on-chain wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Create UTEXOWallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Active: Recovered', exact: true })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link')).toHaveText(['Home', 'On-chain Wallet', 'Keys']);
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link')).toHaveText(['Home', 'UTXO Wallet', 'Keys']);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByLabel('Jump to section', { exact: true }).selectOption('backup');
   await expect(page.locator('#sec-backup')).toBeInViewport();
@@ -123,9 +138,9 @@ test('failed initialization is recoverable and removed routes return home', asyn
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('link', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('main').getByRole('link')).toHaveText([
-    /On-chain Wallet/, /Keys/,
+    /UTXO Wallet/, /Keys/,
   ]);
-  for (const route of ['/utexo-wallet', '/lsp-apay', '/backup']) {
+  for (const route of ['/lsp-apay', '/backup']) {
     await page.goto(route);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('RGB SDK Web Demo');
     await expect(page).toHaveURL((url) => url.pathname === '/');

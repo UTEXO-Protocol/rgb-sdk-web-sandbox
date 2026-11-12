@@ -7,7 +7,7 @@ import { saveSessions, setUrlWallet } from '../lib/session';
 
 const navLinks = [
   { to: '/', label: 'Home' },
-  { to: '/onchain', label: 'On-chain Wallet' },
+  { to: '/utexo-wallet', label: 'UTXO Wallet' },
   { to: '/keys', label: 'Keys' },
 ];
 
@@ -238,7 +238,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      <main className={`${pathname === '/onchain' ? 'max-w-6xl' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 sm:py-8`}>{children}</main>
+      <main className={`${pathname === '/utexo-wallet' ? 'max-w-6xl' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 sm:py-8`}>{children}</main>
     </div>
   );
 }

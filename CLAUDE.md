@@ -14,10 +14,11 @@
 
 ## SDKs
 
-The primary `/onchain` screen uses the local, unpublished `@utexo/rgb-sdk`
-facade over the local `@utexo/rgb-sdk-web` `RgbLibWeb` engine (`RGB_L1`). Its
+The existing `UtexoWalletPage` at `/utexo-wallet` uses the local, unpublished
+`@utexo/rgb-sdk` facade over the local `@utexo/rgb-sdk-web` `RgbLibWeb` engine (`RGB_L1`). Its
 shared contract and key helpers come from `@utexo/rgb-sdk-core`.
 
+Keep the original wallet page and route; `/onchain` is a compatibility redirect.
 This is an on-chain-only app. Do not add the old RLN SDK, Lightning/LSP/APay
 screens, begin/sign/end flows or legacy package aliases. File and VSS backup
 controls are part of the on-chain wallet screen.
