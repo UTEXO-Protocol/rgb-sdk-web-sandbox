@@ -25,5 +25,10 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
-# Local scripts
-scripts/start-lsp-web.sh
+
+# Browser test artifacts
+test-results/
+playwright-report/
+
+# Locally packed SDK builds
+*.tgz

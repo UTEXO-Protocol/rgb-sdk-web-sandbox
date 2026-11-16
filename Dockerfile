@@ -4,9 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-# The lockfile currently contains local file: dependencies.
-# npm install resolves dependencies from package.json for CI/container builds.
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build

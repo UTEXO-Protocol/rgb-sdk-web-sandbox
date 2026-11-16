@@ -1,14 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { initRlnWasm } from '@utexo/rgb-sdk-web';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
 import { autoRestore, getSavedActiveWalletId, setUrlWallet } from './lib/session';
+import { UtexoWalletPage } from './pages/UtexoWalletPage';
 import { HomePage } from './pages/HomePage';
 import { KeysPage } from './pages/KeysPage';
-import { UtexoBackupPage } from './pages/UtexoBackupPage';
-import { UtexoWalletPage } from './pages/UtexoWalletPage';
-import { LspApayPage } from './pages/LspApayPage';
+
+function WalletRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: '/utexo-wallet', search, hash }} replace />;
+}
 
 function App() {
   const setSdkStatus = useStore((s) => s.setSdkStatus);
@@ -20,10 +22,8 @@ function App() {
     if (didInit.current) return;
     didInit.current = true;
     setSdkStatus('loading');
-    initRlnWasm()
+    Promise.resolve()
       .then(async () => {
-        setSdkStatus('ready');
-        addLog('SDK initialized', 'ok');
         const { wallets: restored, errors } = await autoRestore();
         if (restored.length > 0) {
           // URL param > sessionStorage > last wallet
@@ -40,15 +40,10 @@ function App() {
           addLog(restored.length + ' wallet(s) restored from session', 'ok');
         }
         for (const { label, error } of errors) {
-          const isRemoved = error.includes('missing network type');
-          const isNetworkConflict = error.includes('Bitcoin network mismatch');
-          addLog(
-            'Restore failed — "' + label + '": ' + error +
-            (isRemoved ? ' (entry removed — recreate the wallet)' : '') +
-            (isNetworkConflict ? ' — IDB conflict: another wallet with the same mnemonic but a different network wrote to the same IndexedDB key. Use a different mnemonic, or clear IndexedDB in DevTools → Application → IndexedDB.' : ''),
-            'err',
-          );
+          addLog('Restore failed — "' + label + '": ' + error, 'err');
         }
+        setSdkStatus('ready');
+        addLog('SDK ready', 'ok');
       })
       .catch((e) => {
         setSdkStatus('error', String(e));
@@ -61,10 +56,10 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/keys" element={<KeysPage />} />
-          <Route path="/backup" element={<UtexoBackupPage />} />
           <Route path="/utexo-wallet" element={<UtexoWalletPage />} />
-          <Route path="/lsp-apay" element={<LspApayPage />} />
+          <Route path="/onchain" element={<WalletRedirect />} />
+          <Route path="/keys" element={<KeysPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </BrowserRouter>

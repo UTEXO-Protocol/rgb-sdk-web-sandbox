@@ -1,17 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import type { SdkLogEntry } from '../store';
 import { json } from '../lib/utils';
-import { mineBlocks } from '../lib/utils';
 import { saveSessions, setUrlWallet } from '../lib/session';
 
 const navLinks = [
   { to: '/', label: 'Home' },
-  { to: '/keys', label: 'Keys' },
   { to: '/utexo-wallet', label: 'UTXO Wallet' },
-  { to: '/lsp-apay', label: 'LSP & APay' },
-  { to: '/backup', label: 'Backup' },
+  { to: '/keys', label: 'Keys' },
 ];
 
 const statusStyles: Record<string, string> = {
@@ -70,6 +67,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
+  const { pathname } = useLocation();
   const sdkStatus = useStore((s) => s.sdkStatus);
   const sdkError = useStore((s) => s.sdkError);
   const log = useStore((s) => s.log);
@@ -86,8 +84,6 @@ export function Layout({ children }: LayoutProps) {
   const [logOpen, setLogOpen] = useState(false);
   const [sdkLogOpen, setSdkLogOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [mineCount, setMineCount] = useState('1');
-  const [mining, setMining] = useState(false);
   const sdkLogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,31 +93,19 @@ export function Layout({ children }: LayoutProps) {
   }, [sdkLog, sdkLogOpen]);
 
   const activeWallet = wallets.find((w) => w.id === activeWalletId) ?? null;
-  const activeNetwork = (() => {
-    try { return activeWallet?.instance.getNetwork() ?? null; } catch { return null; }
-  })();
-  const isRegtest = activeNetwork === 'regtest';
-
-  async function handleMine() {
-    const n = parseInt(mineCount) || 1;
-    setMining(true);
-    try {
-      addLog('Mining ' + n + ' block(s)...', 'info');
-      await mineBlocks(n);
-      addLog('Mined ' + n + ' block(s)', 'ok');
-    } catch (e) {
-      addLog('Mine failed: ' + e, 'err');
-    } finally {
-      setMining(false);
-    }
-  }
-
-  function handleRemoveActive() {
+  async function handleRemoveActive() {
     if (!activeWallet) return;
     if (!window.confirm('Remove wallet "' + activeWallet.label + '"?')) return;
+    try {
+      await activeWallet.instance.destroy();
+    } catch (error) {
+      addLog('Could not close wallet: ' + error, 'err');
+      return;
+    }
     removeWallet(activeWallet.id);
     const remaining = wallets.filter((w) => w.id !== activeWallet.id);
     saveSessions(remaining, remaining[remaining.length - 1]?.id ?? null);
+    setUrlWallet(remaining[remaining.length - 1]?.id ?? null);
     addLog('Wallet "' + activeWallet.label + '" removed', 'warn');
   }
 
@@ -137,9 +121,9 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9]">
       <header className="border-b border-[#30363d] px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
           <span className="text-[#58a6ff] font-bold text-lg whitespace-nowrap">RGB SDK Demo</span>
-          <nav className="flex gap-4 flex-wrap">
+          <nav aria-label="Main navigation" className="flex gap-4 flex-wrap">
             {navLinks.map((l) => (
               <NavLink
                 key={l.to}
@@ -162,6 +146,7 @@ export function Layout({ children }: LayoutProps) {
           {wallets.length > 0 && (
             <div className="flex items-center gap-1">
               <select
+                aria-label="Active wallet"
                 value={activeWalletId ?? ''}
                 onChange={(e) => {
                   const id = e.target.value || null;
@@ -178,7 +163,7 @@ export function Layout({ children }: LayoutProps) {
                 ))}
               </select>
               <span className="text-xs text-[#484f58]">
-                {activeWallet?.type === 'utexo' ? 'UTXO' : activeWallet?.type === 'rln' ? 'RLN' : ''}
+                RGB_L1
               </span>
               <button
                 onClick={handleRemoveActive}
@@ -186,30 +171,6 @@ export function Layout({ children }: LayoutProps) {
                 className="text-xs px-1.5 py-0.5 text-[#8b949e] hover:text-[#f85149] hover:bg-[#2d1117] rounded"
               >
                 ×
-              </button>
-            </div>
-          )}
-
-          {/* Mine button (regtest only) */}
-          {isRegtest && (
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-[#d29922] px-2 py-0.5 rounded bg-[#2a1f00] border border-[#d29922]/30">
-                regtest
-              </span>
-              <input
-                type="number"
-                value={mineCount}
-                onChange={(e) => setMineCount(e.target.value)}
-                className="w-12 text-xs px-1.5 py-1 bg-[#161b22] border border-[#30363d] rounded text-center text-[#c9d1d9]"
-                min="1"
-                max="100"
-              />
-              <button
-                onClick={handleMine}
-                disabled={mining}
-                className="text-xs px-2 py-1 bg-[#d29922] hover:bg-[#e3b341] disabled:opacity-50 rounded text-black font-semibold"
-              >
-                {mining ? '⛏…' : '⛏ Mine'}
               </button>
             </div>
           )}
@@ -277,7 +238,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      <main className="max-w-4xl mx-auto px-6 py-8">{children}</main>
+      <main className={`${pathname === '/utexo-wallet' ? 'max-w-6xl' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 sm:py-8`}>{children}</main>
     </div>
   );
 }

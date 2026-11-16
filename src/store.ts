@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { UTEXOWallet, RlnWalletManager } from '@utexo/rgb-sdk-web';
+import type { OnchainConfig, OnchainWallet } from './lib/onchain';
+import { removeSessionEntry } from './lib/session';
 import { wrapWallet } from './lib/wrapWallet';
 
 type LogLevel = 'ok' | 'err' | 'warn' | 'info';
@@ -21,33 +22,17 @@ interface LogEntry {
   level: LogLevel;
 }
 
-export interface WalletConfig {
-  network: string;
-  indexerUrl: string;
-  transportEndpoint: string;
-  masterFingerprint: string;
-  xpubVan: string;
-  xpubCol: string;
-  mnemonic: string;
-  reuseAddresses?: boolean;
-  /** RLN SDK password (stored for session restore) */
-  password?: string;
-  /** WebSocket proxy URL for the LN node. When unset, transportEndpoint is used as fallback. */
-  proxyUrl?: string;
-  /** Stable runtime ID for persistent LN node state across page reloads */
-  nodeRuntimeId?: string;
-  /** VSS cloud-backup server URL passed to the wallet; null = VSS disabled.
-   *  Undefined (legacy sessions) falls back to DEMO_VSS_URL on restore. */
-  vssUrl?: string | null;
-}
-
 export interface WalletInstance {
   id: string;
   label: string;
-  type: 'utexo' | 'rln';
-  config: WalletConfig;
-  instance: UTEXOWallet | RlnWalletManager;
+  type: 'onchain';
+  config: OnchainConfig;
+  instance: OnchainWallet;
   online: boolean;
+}
+
+function loggedWallet<T extends WalletInstance>(wallet: T, log: (entry: SdkLogEntry) => void): T {
+  return { ...wallet, instance: wrapWallet(wallet.instance, log) };
 }
 
 interface Store {
@@ -84,17 +69,18 @@ export const useStore = create<Store>((set, get) => ({
     set({ sdkStatus, sdkError: err ?? null }),
 
   addWallet: (w) => {
-    const wrapped = { ...w, instance: wrapWallet(w.instance, get().addSdkLog) };
+    const wrapped = loggedWallet(w, get().addSdkLog);
     set((s) => ({ wallets: [...s.wallets, wrapped], activeWalletId: w.id }));
   },
 
   setWallets: (wallets, activeWalletId) => {
     const addSdkLog = get().addSdkLog;
-    const wrapped = wallets.map((w) => ({ ...w, instance: wrapWallet(w.instance, addSdkLog) }));
+    const wrapped = wallets.map((w) => (loggedWallet(w, addSdkLog)));
     set({ wallets: wrapped, activeWalletId });
   },
 
-  removeWallet: (id) =>
+  removeWallet: (id) => {
+    removeSessionEntry(id);
     set((s) => {
       const wallets = s.wallets.filter((w) => w.id !== id);
       const activeWalletId =
@@ -102,7 +88,8 @@ export const useStore = create<Store>((set, get) => ({
           ? (wallets[wallets.length - 1]?.id ?? null)
           : s.activeWalletId;
       return { wallets, activeWalletId };
-    }),
+    });
+  },
 
   setActiveWalletId: (activeWalletId) => set({ activeWalletId }),
 

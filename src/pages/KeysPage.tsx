@@ -4,7 +4,7 @@ import {
   restoreKeys,
   deriveKeysFromMnemonic,
   bip39,
-} from '@utexo/rgb-sdk-web';
+} from '@utexo/rgb-sdk-core';
 import { useStore } from '../store';
 import { Section } from '../components/Section';
 import { Field, inputCls, selectCls, textareaCls } from '../components/Field';
