@@ -1,27 +1,21 @@
 # RGB SDK Web Playground
 
-On-chain browser playground for the unpublished `@utexo/rgb-sdk` facade and
+On-chain browser playground for the `@utexo/rgb-sdk` facade and the
 `@utexo/rgb-sdk-web` on-chain engine. The app constructs
 `new UTEXOWallet({ engine: new RgbLibWeb(config) })` and calls the facade.
 
 ## Run
 
-Use Node 22+ and npm. Core is installed from npm as
-`@utexo/rgb-sdk-core@1.0.0-beta.10`. The facade and web engine are not published
-yet, so a fresh checkout first needs their locally built SDK archives; follow
-**Local SDK changes** below to prepare them from the sibling repositories.
-
-With those archives already prepared and matching the lockfile:
+Use Node 22+ and npm. All SDK packages come from npm, pinned in
+`package.json` and the lockfile: `@utexo/rgb-sdk@1.0.0-beta.10`,
+`@utexo/rgb-sdk-web@1.0.0-beta.13` and `@utexo/rgb-sdk-core@1.0.0-beta.10`.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:5173/utexo-wallet. `vendor/*.tgz` contains local builds of
-`rgb-sdk` and `rgb-sdk-web`; these archives are ignored by Git.
-`vendor/sdk-snapshots.json` records their source commits and SHA-256 checksums;
-the lockfile pins their npm integrity hashes.
+Open http://localhost:5173/utexo-wallet.
 
 `UtexoWalletPage` retains the original `/utexo-wallet` route and provides wallet
 creation, balances, UTXOs, NIA/IFA issuance,
@@ -47,36 +41,11 @@ is saved in browser localStorage. Keep a mnemonic and encrypted state backup
 outside the browser. VSS is off unless a URL is entered in the creation form.
 Backup passwords and archive bytes are excluded from the SDK activity log.
 
-## Local SDK changes
+## SDK versions
 
-With these sibling checkouts and their development dependencies installed:
-
-```text
-rgb-sdk-split/
-  rgb-sdk/
-  rgb-sdk-web/
-  rgb-sdk-web-sandbox/
-```
-
-Run from the sandbox:
-
-```sh
-npm run sdk:pack
-npm install --force
-npm run build
-```
-
-Keep the generated `vendor/*.tgz` archives local; do not commit them. When
-updating SDK sources, review the snapshot manifest and lockfile changes
-alongside the source revisions. `sdk:pack` builds the sibling working trees;
-it does not change their source files, branches or dependency declarations.
-A snapshot records uncommitted changes if present. Restart Vite after repacking.
-
-Once compatible facade and web-engine versions are published, replace
-the `file:vendor/...` dependencies with those npm versions, regenerate the
-lockfile, and remove the temporary packing script and snapshot manifest. Do
-not substitute the currently published legacy packages: they expose a
-different API.
+To move to newer SDK releases, change the pinned versions in `package.json`,
+run `npm install`, and review the lockfile diff. Do not substitute the legacy
+`@utexo/rgb-sdk` releases before `1.0.0-beta.10`: they expose a different API.
 
 Vite and TypeScript both resolve installed packages. There are no implicit
 sibling-source aliases or registry fallbacks to a different SDK implementation.
@@ -141,12 +110,7 @@ profiles with the same mnemonic, encrypted backup/restore, profile removal,
 preservation of older session records, and removal of legacy routes. It needs no chain,
 proxy or VSS server and does not test funded transactions or VSS service calls.
 
-Docker copies locally prepared `vendor/` archives before `npm ci`. A clean CI
-checkout does not include them and cannot install these unpublished SDK
-versions. CI and deployment require matching archives to be supplied before
-installation, or the switch to compatible published npm packages described
-above. Removing the archives from Git does not make registry installation
-available.
+Docker installs the same locked npm packages with `npm ci`.
 
 ### Regtest UI integration
 

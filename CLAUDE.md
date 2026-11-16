@@ -2,20 +2,18 @@
 
 ## Commands
 
-- `npm ci`: install the locked dependencies, including the tracked SDK snapshots.
+- `npm ci`: install the locked dependencies (all SDK packages from npm).
 - `npm run dev`: Vite on port 5173.
 - `npm run typecheck`: TypeScript.
 - `npm run build`: TypeScript and production build.
 - `npm run test:e2e`: offline Playwright suite against dev and production preview (build first).
 - `npm run test:regtest`: funded BTC/RGB flows through the UI; needs the local
   RGB_L1 stand and connected Bitcoin peers (see README).
-- `npm run sdk:pack`: build and pack sibling core/facade/web checkouts into `vendor/`.
-  Follow with `npm install --force` and commit the snapshots, manifest and lockfile.
 
 ## SDKs
 
-The existing `UtexoWalletPage` at `/utexo-wallet` uses the local, unpublished
-`@utexo/rgb-sdk` facade over the local `@utexo/rgb-sdk-web` `RgbLibWeb` engine (`RGB_L1`). Its
+The existing `UtexoWalletPage` at `/utexo-wallet` uses the published
+`@utexo/rgb-sdk` facade over the published `@utexo/rgb-sdk-web` `RgbLibWeb` engine (`RGB_L1`). Its
 shared contract and key helpers come from `@utexo/rgb-sdk-core`.
 
 Keep the original wallet page and route; `/onchain` is a compatibility redirect.
@@ -42,7 +40,7 @@ appear in activity logs. This sandbox stores mnemonics in localStorage.
 
 ## Bundling
 
-Resolve installed tarball packages; do not add sibling source aliases that
+Resolve installed npm packages; do not add sibling source aliases that
 make TypeScript, Vite and clean installs use different SDK versions. Keep
 `@utexo/rgb-sdk-web` and `@utexo/rgb-lib-wasm` out of Vite dependency
 optimization. The WASM URL is handled by Vite directly; no Node polyfills,
